@@ -83,7 +83,7 @@ tests/
 #### Commands Module (`src/commands/`)
 
 - `helpers.ts` - Display command information and help
-  - `printAvailableCommands()` - Lists all 10 available commands
+  - `printAvailableCommands()` - Lists all 11 available commands
   - `printCommandDetail(command)` - Shows detailed help for specific command
   - `getCurrentVersion()` - Reads version from package.json
 - `runner.ts` - Execute commands in headless mode
@@ -92,7 +92,7 @@ tests/
 #### Config Module (`src/config/`)
 
 - `constants.ts` - Centralized configuration
-  - `COMMANDS[]` - Array of 10 available Confluence command names
+  - `COMMANDS[]` - Array of 11 available Confluence command names
   - `COMMANDS_INFO[]` - Brief descriptions for each command
   - `COMMANDS_DETAIL[]` - Detailed parameter documentation
 
@@ -105,11 +105,11 @@ tests/
   - `getConfluenceClientOptions(config, profileName)` - Builds confluence.js client options
   - TypeScript interfaces: `Config`, `ConfluenceProfile`, `ConfluenceClientOptions`
 - `confluence-client.ts` - Confluence API wrapper functions
-  - Exports: `listSpaces()`, `getSpace()`, `listPages()`, `getPage()`, `createPage()`, `updatePage()`, `addComment()`, `deletePage()`, `getUser()`, `testConnection()`, `clearClients()`
+  - Exports: `listSpaces()`, `getSpace()`, `listPages()`, `getPage()`, `createPage()`, `updatePage()`, `addComment()`, `deletePage()`, `downloadAttachment()`, `getUser()`, `testConnection()`, `clearClients()`
   - Manages singleton `ConfluenceUtil` instance
 - `confluence-utils.ts` - Core Confluence utility class
   - `ConfluenceUtil` class - Client pooling and API calls
-  - Implements all 10 Confluence commands
+  - Implements all 11 Confluence commands
   - Formats results as JSON or TOON
 
 ### Configuration System
@@ -140,7 +140,7 @@ defaultFormat: json
 
 - Custom prompt: `conni>`
 - **Special commands**: `help`, `commands`, `profiles`, `profile <name>`, `format <type>`, `clear`, `exit/quit/q`
-- **Confluence commands**: 10 commands accepting JSON arguments
+- **Confluence commands**: 11 commands accepting JSON arguments
   1. `list-spaces` - List all accessible spaces
   2. `get-space` - Get details of a specific space
   3. `list-pages` - List pages in a space or by search criteria
@@ -149,8 +149,9 @@ defaultFormat: json
   6. `update-page` - Update an existing page
   7. `add-comment` - Add a comment to a page
   8. `delete-page` - Delete a page
-  9. `get-user` - Get user information
-  10. `test-connection` - Test Confluence API connection
+  9. `download-attachment` - Download an attachment from a page
+  10. `get-user` - Get user information
+  11. `test-connection` - Test Confluence API connection
 
 ### TypeScript Configuration
 
@@ -161,7 +162,7 @@ defaultFormat: json
 
 ## Available Commands
 
-The CLI provides **10 Confluence commands**:
+The CLI provides **11 Confluence commands**:
 
 1. **list-spaces** - List all accessible spaces
 2. **get-space** - Get details of a specific space
@@ -171,8 +172,9 @@ The CLI provides **10 Confluence commands**:
 6. **update-page** - Update an existing page
 7. **add-comment** - Add a comment to a page
 8. **delete-page** - Delete a page
-9. **get-user** - Get user information
-10. **test-connection** - Test Confluence API connection
+9. **download-attachment** - Download an attachment from a page
+10. **get-user** - Get user information
+11. **test-connection** - Test Confluence API connection
 
 ### Command Examples
 
@@ -181,7 +183,7 @@ The CLI provides **10 Confluence commands**:
 npm start
 
 # Inside the REPL:
-conni> commands                          # List all 10 commands
+conni> commands                          # List all 11 commands
 conni> help                              # Show help
 conni> profiles                          # List available profiles
 conni> profile production                # Switch profile
@@ -192,6 +194,7 @@ conni> list-pages '{"spaceKey":"DOCS","title":"Getting Started","limit":10}'
 conni> get-page '{"pageId":"123456"}'
 conni> create-page '{"spaceKey":"DOCS","title":"New Page","body":"<p>Hello World</p>"}'
 conni> add-comment '{"pageId":"123456","body":"<p>Great article!</p>"}'
+conni> download-attachment '{"attachmentId":"att12345","outputPath":"./document.pdf"}'
 conni> exit                              # Exit
 
 # Headless mode (one-off commands):

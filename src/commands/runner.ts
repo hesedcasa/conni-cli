@@ -3,6 +3,7 @@ import {
   clearClients,
   createPage,
   deletePage,
+  downloadAttachment,
   getPage,
   getSpace,
   getUser,
@@ -91,6 +92,14 @@ export const runCommand = async (
           process.exit(1);
         }
         result = await deletePage(profile, args.pageId);
+        break;
+
+      case 'download-attachment':
+        if (!args.attachmentId) {
+          console.error('ERROR: "attachmentId" parameter is required');
+          process.exit(1);
+        }
+        result = await downloadAttachment(profile, args.attachmentId, args.outputPath);
         break;
 
       case 'get-user':

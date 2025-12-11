@@ -1,5 +1,7 @@
 import { encode } from '@toon-format/toon';
 import { ConfluenceClient } from 'confluence.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 import type { Config } from './config-loader.js';
 import { getConfluenceClientOptions } from './config-loader.js';
@@ -21,10 +23,12 @@ export interface ApiResult {
 export class ConfluenceUtil {
   private config: Config;
   private clientPool: Map<string, ConfluenceClient>;
+  private optionsPool: Map<string, ReturnType<typeof getConfluenceClientOptions>>;
 
   constructor(config: Config) {
     this.config = config;
     this.clientPool = new Map();
+    this.optionsPool = new Map();
   }
 
   /**
@@ -38,8 +42,18 @@ export class ConfluenceUtil {
     const options = getConfluenceClientOptions(this.config, profileName);
     const client = new ConfluenceClient(options);
     this.clientPool.set(profileName, client);
+    this.optionsPool.set(profileName, options);
 
     return client;
+  }
+
+  /**
+   * Get client options for a profile
+   */
+  getClientOptions(profileName: string): ReturnType<typeof getConfluenceClientOptions> {
+    // Ensure client is created (which also creates options)
+    this.getClient(profileName);
+    return this.optionsPool.get(profileName)!;
   }
 
   /**
@@ -189,7 +203,7 @@ export class ConfluenceUtil {
       const client = this.getClient(profileName);
       const page = await client.content.getContentById({
         id: pageId,
-        expand: ['body.storage', 'version', 'space'],
+        expand: ['body.storage', 'children.attachment'],
       });
 
       return {
@@ -362,6 +376,68 @@ export class ConfluenceUtil {
       return {
         success: true,
         result: `Page ${pageId} deleted successfully!`,
+      };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error: `ERROR: ${errorMessage}`,
+      };
+    }
+  }
+
+  /**
+   * Download an attachment from a page
+   */
+  async downloadAttachment(profileName: string, attachmentId: string, outputPath?: string): Promise<ApiResult> {
+    try {
+      const client = this.getClient(profileName);
+
+      // Get attachment metadata with container (parent content) information
+      const attachment = await client.content.getContentById({
+        id: attachmentId,
+        expand: ['container', 'metadata.mediaType', 'version'],
+      });
+
+      // Extract file info
+      const fileName = (attachment as { title?: string }).title || 'download';
+      const mediaType =
+        (attachment as { metadata?: { mediaType?: string } }).metadata?.mediaType || 'application/octet-stream';
+
+      // Get parent content ID from container
+      const containerId = (attachment as { container?: { id?: string } }).container?.id;
+
+      if (!containerId) {
+        return {
+          success: false,
+          error: 'ERROR: Parent content ID not found in attachment metadata',
+        };
+      }
+
+      // Use built-in downloadAttachment method from confluence.js
+      const buffer = await client.contentAttachments.downloadAttachment({
+        id: containerId,
+        attachmentId,
+      });
+
+      // Determine output file path
+      const finalPath = outputPath || path.join(process.cwd(), fileName);
+
+      // Write file to disk
+      fs.writeFileSync(finalPath, buffer);
+
+      const fileSize = buffer.length;
+      const fileSizeKB = (fileSize / 1024).toFixed(2);
+
+      return {
+        success: true,
+        data: {
+          fileName,
+          filePath: finalPath,
+          fileSize,
+          mediaType,
+        },
+        result: `Attachment downloaded successfully!\n\nFile: ${fileName}\nPath: ${finalPath}\nSize: ${fileSizeKB} KB\nType: ${mediaType}`,
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);

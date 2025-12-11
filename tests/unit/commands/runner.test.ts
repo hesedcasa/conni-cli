@@ -12,6 +12,7 @@ vi.mock('../../../src/utils/index.js', () => ({
   updatePage: vi.fn(),
   addComment: vi.fn(),
   deletePage: vi.fn(),
+  downloadAttachment: vi.fn(),
   getUser: vi.fn(),
   testConnection: vi.fn(),
   loadConfig: vi.fn(),
@@ -406,6 +407,34 @@ describe('commands/runner', () => {
 
       exitSpy.mockRestore();
       consoleErrorSpy.mockRestore();
+    });
+
+    it('should execute download-attachment command', async () => {
+      const { downloadAttachment, loadConfig } = await import('../../../src/utils/index.js');
+      loadConfig.mockReturnValue({
+        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
+        defaultProfile: 'cloud',
+        defaultFormat: 'json',
+      });
+      downloadAttachment.mockResolvedValue({
+        success: true,
+        result:
+          'Attachment downloaded successfully!\n\nFile: document.pdf\nPath: /tmp/document.pdf\nSize: 16.00 KB\nType: application/pdf',
+      });
+
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await runCommand('download-attachment', '{"attachmentId":"att12345","outputPath":"./document.pdf"}', null);
+
+      expect(downloadAttachment).toHaveBeenCalledWith('cloud', 'att12345', './document.pdf');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        'Attachment downloaded successfully!\n\nFile: document.pdf\nPath: /tmp/document.pdf\nSize: 16.00 KB\nType: application/pdf'
+      );
+      expect(exitSpy).toHaveBeenCalledWith(0);
+
+      exitSpy.mockRestore();
+      consoleLogSpy.mockRestore();
     });
 
     it('should execute get-user with accountId', async () => {
