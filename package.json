@@ -1,6 +1,6 @@
 {
   "name": "conni-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A powerful command-line interface for Confluence interaction with support for pages, spaces, and multiple output formats",
   "main": "dist/index.js",
   "bin": {
