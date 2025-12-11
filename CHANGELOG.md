@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/hesedcasa/conni-cli/compare/conni-cli-v1.0.0...conni-cli-v1.1.0) (2025-12-11)
+
+
+### 🎉 Features
+
+* add download-attachment command to download files from Confluence ([#3](https://github.com/hesedcasa/conni-cli/issues/3)) ([1398319](https://github.com/hesedcasa/conni-cli/commit/1398319a15aff180e7c060b561aa46c1e14ad126))
+
 ## 1.0.0 (2025-12-11)
 
 
