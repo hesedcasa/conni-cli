@@ -150,6 +150,21 @@ export async function deletePage(profile: string, pageId: string): Promise<ApiRe
 }
 
 /**
+ * Download an attachment from a page
+ * @param profile - Confluence profile name
+ * @param attachmentId - Attachment ID to download
+ * @param outputPath - Path to save the file (optional)
+ */
+export async function downloadAttachment(
+  profile: string,
+  attachmentId: string,
+  outputPath?: string
+): Promise<ApiResult> {
+  const confluence = await initConfluence();
+  return await confluence.downloadAttachment(profile, attachmentId, outputPath);
+}
+
+/**
  * Get user information
  * @param profile - Confluence profile name
  * @param accountId - User account ID

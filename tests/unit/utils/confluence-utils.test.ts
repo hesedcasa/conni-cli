@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getConfluenceClientOptions } from '../../../src/utils/config-loader.js';
@@ -15,6 +16,10 @@ vi.mock('../../../src/utils/config-loader.js', async () => {
     getConfluenceClientOptions: vi.fn(),
   };
 });
+// Mock fs module
+vi.mock('node:fs', () => ({
+  writeFileSync: vi.fn(),
+}));
 
 // Define mock client type
 interface MockConfluenceClient {
@@ -28,6 +33,9 @@ interface MockConfluenceClient {
     createContent: ReturnType<typeof vi.fn>;
     updateContent: ReturnType<typeof vi.fn>;
     deleteContent: ReturnType<typeof vi.fn>;
+  };
+  contentAttachments: {
+    downloadAttachment: ReturnType<typeof vi.fn>;
   };
   users: {
     getUser: ReturnType<typeof vi.fn>;
@@ -53,6 +61,9 @@ vi.mock('confluence.js', () => {
         createContent: vi.fn(),
         updateContent: vi.fn(),
         deleteContent: vi.fn(),
+      };
+      this.contentAttachments = {
+        downloadAttachment: vi.fn(),
       };
       this.users = {
         getUser: vi.fn(),
@@ -86,6 +97,9 @@ describe('confluence-utils', () => {
         createContent: vi.fn(),
         updateContent: vi.fn(),
         deleteContent: vi.fn(),
+      },
+      contentAttachments: {
+        downloadAttachment: vi.fn(),
       },
       users: {
         getUser: vi.fn(),
@@ -394,7 +408,7 @@ describe('confluence-utils', () => {
 
         expect(mockClient.content.getContentById).toHaveBeenCalledWith({
           id: '123',
-          expand: ['body.storage', 'version', 'space'],
+          expand: ['body.storage', 'children.attachment'],
         });
         expect(result.success).toBe(true);
         expect(result.data).toBe(mockPage);
@@ -674,6 +688,119 @@ describe('confluence-utils', () => {
 
         // @ts-expect-error - accessing private property for testing
         expect(confluenceUtil.clientPool.size).toBe(0);
+      });
+    });
+
+    describe('downloadAttachment', () => {
+      const mockBuffer = Buffer.alloc(16384); // 16KB buffer
+
+      it('should download attachment successfully', async () => {
+        const mockAttachment = {
+          id: 'att123',
+          title: 'document.pdf',
+          metadata: { mediaType: 'application/pdf' },
+          container: { id: 'page456' },
+        };
+        mockClient.content.getContentById.mockResolvedValue(mockAttachment);
+        mockClient.contentAttachments.downloadAttachment.mockResolvedValue(mockBuffer);
+
+        const result = await confluenceUtil.downloadAttachment('cloud', 'att123', '/tmp/document.pdf');
+
+        expect(mockClient.content.getContentById).toHaveBeenCalledWith({
+          id: 'att123',
+          expand: ['container', 'metadata.mediaType', 'version'],
+        });
+        expect(mockClient.contentAttachments.downloadAttachment).toHaveBeenCalledWith({
+          id: 'page456',
+          attachmentId: 'att123',
+        });
+        expect(fs.writeFileSync).toHaveBeenCalledWith('/tmp/document.pdf', mockBuffer);
+        expect(result.success).toBe(true);
+        expect(result.data).toEqual({
+          fileName: 'document.pdf',
+          filePath: '/tmp/document.pdf',
+          fileSize: mockBuffer.length,
+          mediaType: 'application/pdf',
+        });
+        expect(result.result).toContain('document.pdf');
+        expect(result.result).toContain('/tmp/document.pdf');
+        expect(result.result).toContain('16.00 KB');
+        expect(result.result).toContain('application/pdf');
+      });
+
+      it('should use default filename if title not provided', async () => {
+        const mockAttachment = {
+          id: 'att123',
+          title: undefined,
+          metadata: { mediaType: 'text/plain' },
+          container: { id: 'page456' },
+        };
+        mockClient.content.getContentById.mockResolvedValue(mockAttachment);
+        mockClient.contentAttachments.downloadAttachment.mockResolvedValue(mockBuffer);
+
+        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+
+        expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/download$/), mockBuffer);
+        expect(result.success).toBe(true);
+        expect(result.data?.fileName).toBe('download');
+      });
+
+      it('should use default media type if not provided', async () => {
+        const mockAttachment = {
+          id: 'att123',
+          title: 'file.txt',
+          metadata: { mediaType: undefined },
+          container: { id: 'page456' },
+        };
+        mockClient.content.getContentById.mockResolvedValue(mockAttachment);
+        mockClient.contentAttachments.downloadAttachment.mockResolvedValue(mockBuffer);
+
+        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+
+        expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/file\.txt$/), mockBuffer);
+        expect(result.success).toBe(true);
+        expect(result.data?.mediaType).toBe('application/octet-stream');
+      });
+
+      it('should return error if container not found', async () => {
+        const mockAttachment = {
+          id: 'att123',
+          title: 'file.txt',
+          metadata: { mediaType: 'text/plain' },
+          container: { id: undefined },
+        };
+        mockClient.content.getContentById.mockResolvedValue(mockAttachment);
+
+        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('ERROR: Parent content ID not found in attachment metadata');
+        expect(mockClient.contentAttachments.downloadAttachment).not.toHaveBeenCalled();
+      });
+
+      it('should return error on API failure', async () => {
+        mockClient.content.getContentById.mockRejectedValue(new Error('Attachment not found'));
+
+        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('ERROR: Attachment not found');
+      });
+
+      it('should handle download failure', async () => {
+        const mockAttachment = {
+          id: 'att123',
+          title: 'file.txt',
+          metadata: { mediaType: 'text/plain' },
+          container: { id: 'page456' },
+        };
+        mockClient.content.getContentById.mockResolvedValue(mockAttachment);
+        mockClient.contentAttachments.downloadAttachment.mockRejectedValue(new Error('Download failed'));
+
+        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('ERROR: Download failed');
       });
     });
   });

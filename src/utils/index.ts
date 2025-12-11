@@ -10,6 +10,7 @@ export {
   updatePage,
   addComment,
   deletePage,
+  downloadAttachment,
   getUser,
   testConnection,
   clearClients,

@@ -46,6 +46,7 @@ vi.mock('../../../src/utils/index.js', () => ({
   clearClients: vi.fn(),
   createPage: vi.fn(),
   deletePage: vi.fn(),
+  downloadAttachment: vi.fn(),
   getPage: vi.fn(),
   getSpace: vi.fn(),
   getUser: vi.fn(),
@@ -534,6 +535,22 @@ describe('cli/wrapper', () => {
         await cli['runCommand']('delete-page', '{"pageId":"123"}');
 
         expect(deletePage).toHaveBeenCalledWith('cloud', '123');
+
+        consoleLogSpy.mockRestore();
+      });
+
+      it('should execute download-attachment', async () => {
+        const { downloadAttachment } = await import('../../../src/utils/index.js');
+        vi.mocked(downloadAttachment).mockResolvedValue({
+          success: true,
+          result:
+            'Attachment downloaded successfully!\n\nFile: document.pdf\nPath: /tmp/document.pdf\nSize: 16.00 KB\nType: application/pdf',
+        });
+        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        await cli['runCommand']('download-attachment', '{"attachmentId":"att12345","outputPath":"./document.pdf"}');
+
+        expect(downloadAttachment).toHaveBeenCalledWith('cloud', 'att12345', './document.pdf');
 
         consoleLogSpy.mockRestore();
       });

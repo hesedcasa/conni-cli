@@ -13,6 +13,7 @@ A powerful command-line interface for Confluence interaction with support for pa
 - 📄 **Page management**: create, read, update, delete pages
 - 💬 **Comment support**: add comments to pages with markdown support
 - 📁 **Space operations**: list and view space details
+- 📎 **Attachment downloads**: download files from Confluence pages
 - 🔍 **Search support**: find pages by title, space, or content
 - 👤 **User management**: retrieve user information
 - ✅ **Connection testing** for quick diagnostics
@@ -132,6 +133,9 @@ npx conni-cli create-page '{"spaceKey":"DOCS","title":"New Page","body":"<p>Hell
 
 # Add comment to a page
 npx conni-cli add-comment '{"pageId":"123456","body":"<p>Great article!</p>"}'
+
+# Download an attachment
+npx conni-cli download-attachment '{"attachmentId":"att12345","outputPath":"./document.pdf"}'
 ```
 
 ## Available Commands
@@ -188,6 +192,19 @@ npx conni-cli add-comment '{"pageId":"123456","body":"<p>Great article!</p>"}'
   ```bash
   conni> delete-page {"pageId":"123456"}
   ```
+
+### Attachment Commands
+
+- **download-attachment** - Download an attachment from a page
+
+  ```bash
+  conni> download-attachment {"attachmentId":"att12345"}
+  conni> download-attachment {"attachmentId":"att12345","outputPath":"./document.pdf"}
+  ```
+
+  **Parameters:**
+  - `attachmentId` (required): The ID of the attachment to download
+  - `outputPath` (optional): Path to save the file (defaults to current directory with original filename)
 
 ### User Commands
 
@@ -309,6 +326,9 @@ conni> update-page {"pageId":"123456","title":"Updated Title","body":"<p>Updated
 
 # Add comment to page
 conni> add-comment {"pageId":"123456","body":"<p>Great article!</p>"}
+
+# Download attachment
+conni> download-attachment {"attachmentId":"att12345","outputPath":"./document.pdf"}
 ```
 
 ### Automation Scripts

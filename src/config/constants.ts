@@ -14,6 +14,7 @@ export const COMMANDS: string[] = [
   'update-page',
   'add-comment',
   'delete-page',
+  'download-attachment',
   'get-user',
   'test-connection',
 ];
@@ -30,6 +31,7 @@ export const COMMANDS_INFO: string[] = [
   'Update an existing page',
   'Add a comment to a page',
   'Delete a page',
+  'Download an attachment from a page',
   'Get user information',
   'Test Confluence API connection',
 ];
@@ -109,6 +111,14 @@ Parameters:
 
 Example:
 delete-page '{"pageId":"123456","profile":"cloud"}'`,
+  `
+Parameters:
+- attachmentId (required): string - Attachment ID to download
+- outputPath (optional): string - Path to save the file (default: current directory with original filename)
+- profile (optional): string - Confluence profile name (default: configured default profile)
+
+Example:
+download-attachment '{"attachmentId":"att12345","outputPath":"./document.pdf","profile":"cloud"}'`,
   `
 Parameters:
 - accountId (optional): string - User account ID

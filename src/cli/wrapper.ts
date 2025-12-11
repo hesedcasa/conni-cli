@@ -7,6 +7,7 @@ import {
   clearClients,
   createPage,
   deletePage,
+  downloadAttachment,
   getPage,
   getSpace,
   getUser,
@@ -224,6 +225,15 @@ export class wrapper {
             return;
           }
           result = await deletePage(profile, args.pageId);
+          break;
+
+        case 'download-attachment':
+          if (!args.attachmentId) {
+            console.error('ERROR: "attachmentId" parameter is required');
+            this.rl.prompt();
+            return;
+          }
+          result = await downloadAttachment(profile, args.attachmentId, args.outputPath);
           break;
 
         case 'get-user':
