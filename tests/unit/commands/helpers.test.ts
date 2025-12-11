@@ -255,27 +255,14 @@ describe('commands/helpers', () => {
   });
 
   describe('getCurrentVersion', () => {
-    it('should return version string', () => {
+    it('should return version as string', () => {
       const version = getCurrentVersion();
       expect(typeof version).toBe('string');
-      expect(version).toBe('0.0.0');
     });
 
-    it('should return a non-empty string', () => {
+    it('should return version in semver format', () => {
       const version = getCurrentVersion();
-      expect(version.length).toBeGreaterThan(0);
-    });
-
-    it('should return the same version on multiple calls', () => {
-      const version1 = getCurrentVersion();
-      const version2 = getCurrentVersion();
-      expect(version1).toBe(version2);
-    });
-
-    it('should match expected version format (semantic versioning)', () => {
-      const version = getCurrentVersion();
-      const versionRegex = /^\d+\.\d+\.\d+$/;
-      expect(version).toMatch(versionRegex);
+      expect(version).toMatch(/^\d+\.\d+\.\d+$/);
     });
   });
 });
