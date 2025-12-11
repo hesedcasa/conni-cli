@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getConfluenceClientOptions } from '../../../src/utils/config-loader.js';
@@ -15,6 +16,10 @@ vi.mock('../../../src/utils/config-loader.js', async () => {
     getConfluenceClientOptions: vi.fn(),
   };
 });
+// Mock fs module
+vi.mock('node:fs', () => ({
+  writeFileSync: vi.fn(),
+}));
 
 // Define mock client type
 interface MockConfluenceClient {
@@ -403,7 +408,7 @@ describe('confluence-utils', () => {
 
         expect(mockClient.content.getContentById).toHaveBeenCalledWith({
           id: '123',
-          expand: ['body.storage', 'version', 'space'],
+          expand: ['body.storage', 'children.attachment'],
         });
         expect(result.success).toBe(true);
         expect(result.data).toBe(mockPage);
@@ -709,6 +714,7 @@ describe('confluence-utils', () => {
           id: 'page456',
           attachmentId: 'att123',
         });
+        expect(fs.writeFileSync).toHaveBeenCalledWith('/tmp/document.pdf', mockBuffer);
         expect(result.success).toBe(true);
         expect(result.data).toEqual({
           fileName: 'document.pdf',
@@ -734,6 +740,7 @@ describe('confluence-utils', () => {
 
         const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
 
+        expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/download$/), mockBuffer);
         expect(result.success).toBe(true);
         expect(result.data?.fileName).toBe('download');
       });
@@ -750,6 +757,7 @@ describe('confluence-utils', () => {
 
         const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
 
+        expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/file\.txt$/), mockBuffer);
         expect(result.success).toBe(true);
         expect(result.data?.mediaType).toBe('application/octet-stream');
       });
