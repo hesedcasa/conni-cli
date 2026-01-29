@@ -57,20 +57,13 @@ vi.mock('../../../src/utils/index.js', () => ({
   updatePage: vi.fn(),
 }));
 
-const originalEnv = process.env;
-
 describe('cli/wrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv };
     // Reset the mock readline interface
     mockRlInterface.prompt.mockClear();
     mockRlInterface.on.mockClear();
     mockRlInterface.close.mockClear();
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
   });
 
   describe('wrapper', () => {
@@ -99,8 +92,9 @@ describe('cli/wrapper', () => {
       it('should load config successfully', async () => {
         const { loadConfig } = await import('../../../src/utils/index.js');
         vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
+          host: 'https://test.atlassian.net',
+          email: 'test@test.com',
+          apiToken: 'token',
           defaultFormat: 'json',
         });
 
@@ -114,11 +108,12 @@ describe('cli/wrapper', () => {
         consoleLogSpy.mockRestore();
       });
 
-      it('should set default profile and format', async () => {
+      it('should set default format from config', async () => {
         const { loadConfig } = await import('../../../src/utils/index.js');
         vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
+          host: 'https://test.atlassian.net',
+          email: 'test@test.com',
+          apiToken: 'token',
           defaultFormat: 'toon',
         });
 
@@ -126,8 +121,6 @@ describe('cli/wrapper', () => {
 
         await cli.connect();
 
-        // @ts-expect-error - accessing private property for testing
-        expect(cli.currentProfile).toBe('cloud');
         // @ts-expect-error - accessing private property for testing
         expect(cli.currentFormat).toBe('toon');
 
@@ -151,49 +144,11 @@ describe('cli/wrapper', () => {
           // Expected
         }
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load configuration:', 'Config file not found');
-        expect(consoleErrorSpy).toHaveBeenCalledWith('\nMake sure:');
-        expect(consoleErrorSpy).toHaveBeenCalledWith('1. .claude/atlassian-config.local.md exists');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('Config file not found');
         expect(exitSpy).toHaveBeenCalledWith(1);
 
         consoleErrorSpy.mockRestore();
         exitSpy.mockRestore();
-      });
-
-      it('should use CLAUDE_PROJECT_ROOT if set', async () => {
-        process.env.CLAUDE_PROJECT_ROOT = '/custom/root';
-        const { loadConfig } = await import('../../../src/utils/index.js');
-        vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
-          defaultFormat: 'json',
-        });
-
-        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-        await cli.connect();
-
-        expect(loadConfig).toHaveBeenCalledWith('/custom/root');
-
-        consoleLogSpy.mockRestore();
-      });
-
-      it('should use process.cwd() if CLAUDE_PROJECT_ROOT not set', async () => {
-        delete process.env.CLAUDE_PROJECT_ROOT;
-        const { loadConfig } = await import('../../../src/utils/index.js');
-        vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
-          defaultFormat: 'json',
-        });
-
-        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-        await cli.connect();
-
-        expect(loadConfig).toHaveBeenCalledWith(process.cwd());
-
-        consoleLogSpy.mockRestore();
       });
     });
 
@@ -201,8 +156,9 @@ describe('cli/wrapper', () => {
       beforeEach(async () => {
         const { loadConfig } = await import('../../../src/utils/index.js');
         vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
+          host: 'https://test.atlassian.net',
+          email: 'test@test.com',
+          apiToken: 'token',
           defaultFormat: 'json',
         });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -294,28 +250,6 @@ describe('cli/wrapper', () => {
         consoleSpy.mockRestore();
       });
 
-      it('should switch profile to valid profile', async () => {
-        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-        await cli['handleCommand']('profile cloud');
-
-        expect(consoleLogSpy).toHaveBeenCalledWith('Switched to profile: cloud');
-        expect(mockRlInterface.prompt).toHaveBeenCalled();
-
-        consoleLogSpy.mockRestore();
-      });
-
-      it('should show error for invalid profile', async () => {
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-        await cli['handleCommand']('profile nonexistent');
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('ERROR:'));
-        expect(mockRlInterface.prompt).toHaveBeenCalled();
-
-        consoleErrorSpy.mockRestore();
-      });
-
       it('should switch format to valid format', async () => {
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -336,18 +270,6 @@ describe('cli/wrapper', () => {
         expect(mockRlInterface.prompt).toHaveBeenCalled();
 
         consoleErrorSpy.mockRestore();
-      });
-
-      it('should list available profiles', async () => {
-        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-        await cli['handleCommand']('profiles');
-
-        expect(consoleLogSpy).toHaveBeenCalledWith('\nAvailable profiles:');
-        expect(consoleLogSpy).toHaveBeenCalledWith('1. cloud (current)');
-        expect(mockRlInterface.prompt).toHaveBeenCalled();
-
-        consoleLogSpy.mockRestore();
       });
 
       it('should show command detail with -h flag', async () => {
@@ -388,8 +310,9 @@ describe('cli/wrapper', () => {
       beforeEach(async () => {
         const { loadConfig } = await import('../../../src/utils/index.js');
         vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
+          host: 'https://test.atlassian.net',
+          email: 'test@test.com',
+          apiToken: 'token',
           defaultFormat: 'json',
         });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -404,7 +327,7 @@ describe('cli/wrapper', () => {
 
         await cli['runCommand']('list-spaces', '{}');
 
-        expect(listSpaces).toHaveBeenCalledWith('cloud', 'json');
+        expect(listSpaces).toHaveBeenCalledWith('json');
 
         consoleLogSpy.mockRestore();
       });
@@ -416,7 +339,7 @@ describe('cli/wrapper', () => {
 
         await cli['runCommand']('get-space', '{"spaceKey":"DOCS"}');
 
-        expect(getSpace).toHaveBeenCalledWith('cloud', 'DOCS', 'json');
+        expect(getSpace).toHaveBeenCalledWith('DOCS', 'json');
 
         consoleLogSpy.mockRestore();
       });
@@ -439,7 +362,7 @@ describe('cli/wrapper', () => {
 
         await cli['runCommand']('list-pages', '{"spaceKey":"DOCS","title":"Test","limit":10}');
 
-        expect(listPages).toHaveBeenCalledWith('cloud', 'DOCS', 'Test', 10, undefined, 'json');
+        expect(listPages).toHaveBeenCalledWith('DOCS', 'Test', 10, undefined, 'json');
 
         consoleLogSpy.mockRestore();
       });
@@ -451,7 +374,7 @@ describe('cli/wrapper', () => {
 
         await cli['runCommand']('get-page', '{"pageId":"123"}');
 
-        expect(getPage).toHaveBeenCalledWith('cloud', '123', 'json');
+        expect(getPage).toHaveBeenCalledWith('123', 'json');
 
         consoleLogSpy.mockRestore();
       });
@@ -474,7 +397,7 @@ describe('cli/wrapper', () => {
 
         await cli['runCommand']('create-page', '{"spaceKey":"DOCS","title":"New","body":"<p>Content</p>"}');
 
-        expect(createPage).toHaveBeenCalledWith('cloud', 'DOCS', 'New', '<p>Content</p>', undefined, 'json');
+        expect(createPage).toHaveBeenCalledWith('DOCS', 'New', '<p>Content</p>', undefined, 'json');
 
         consoleLogSpy.mockRestore();
       });
@@ -492,12 +415,12 @@ describe('cli/wrapper', () => {
 
       it('should execute update-page with version', async () => {
         const { updatePage } = await import('../../../src/utils/index.js');
-        vi.mocked(updatePage).mockResolvedValue({ success: true, result: 'Updated' });
+        vi.mocked(updatePage).mockResolvedValue({ success: true, result: '{"id":"123"}' });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-        await cli['runCommand']('update-page', '{"pageId":"123","title":"New","body":"<p>Content</p>","version":1}');
+        await cli['runCommand']('update-page', '{"pageId":"123","title":"Updated","body":"<p>New</p>","version":1}');
 
-        expect(updatePage).toHaveBeenCalledWith('cloud', '123', 'New', '<p>Content</p>', 1);
+        expect(updatePage).toHaveBeenCalledWith('123', 'Updated', '<p>New</p>', 1);
 
         consoleLogSpy.mockRestore();
       });
@@ -505,7 +428,7 @@ describe('cli/wrapper', () => {
       it('should show error if update-page missing version', async () => {
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        await cli['runCommand']('update-page', '{"pageId":"123","title":"New","body":"<p>Content</p>"}');
+        await cli['runCommand']('update-page', '{"pageId":"123","title":"Updated","body":"<p>New</p>"}');
 
         expect(consoleErrorSpy).toHaveBeenCalledWith(
           'ERROR: "pageId", "title", "body", and "version" parameters are required'
@@ -517,100 +440,124 @@ describe('cli/wrapper', () => {
 
       it('should execute add-comment', async () => {
         const { addComment } = await import('../../../src/utils/index.js');
-        vi.mocked(addComment).mockResolvedValue({ success: true, result: '{"id":"999"}' });
+        vi.mocked(addComment).mockResolvedValue({ success: true, result: '{"id":"comment123"}' });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-        await cli['runCommand']('add-comment', '{"pageId":"123","body":"<p>Comment</p>"}');
+        await cli['runCommand']('add-comment', '{"pageId":"123","body":"<p>Great!</p>"}');
 
-        expect(addComment).toHaveBeenCalledWith('cloud', '123', '<p>Comment</p>', 'json');
+        expect(addComment).toHaveBeenCalledWith('123', '<p>Great!</p>', 'json');
 
         consoleLogSpy.mockRestore();
       });
 
+      it('should show error if add-comment missing parameters', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await cli['runCommand']('add-comment', '{"pageId":"123"}');
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith('ERROR: "pageId" and "body" parameters are required');
+        expect(mockRlInterface.prompt).toHaveBeenCalled();
+
+        consoleErrorSpy.mockRestore();
+      });
+
       it('should execute delete-page', async () => {
         const { deletePage } = await import('../../../src/utils/index.js');
-        vi.mocked(deletePage).mockResolvedValue({ success: true, result: 'Deleted' });
+        vi.mocked(deletePage).mockResolvedValue({ success: true, result: 'Page 123 deleted successfully!' });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
         await cli['runCommand']('delete-page', '{"pageId":"123"}');
 
-        expect(deletePage).toHaveBeenCalledWith('cloud', '123');
+        expect(deletePage).toHaveBeenCalledWith('123');
 
         consoleLogSpy.mockRestore();
+      });
+
+      it('should show error if delete-page missing pageId', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await cli['runCommand']('delete-page', '{}');
+
+        expect(consoleErrorSpy).toHaveBeenCalledWith('ERROR: "pageId" parameter is required');
+        expect(mockRlInterface.prompt).toHaveBeenCalled();
+
+        consoleErrorSpy.mockRestore();
       });
 
       it('should execute download-attachment', async () => {
         const { downloadAttachment } = await import('../../../src/utils/index.js');
         vi.mocked(downloadAttachment).mockResolvedValue({
           success: true,
-          result:
-            'Attachment downloaded successfully!\n\nFile: document.pdf\nPath: /tmp/document.pdf\nSize: 16.00 KB\nType: application/pdf',
+          result: 'Attachment downloaded successfully!',
         });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-        await cli['runCommand']('download-attachment', '{"attachmentId":"att12345","outputPath":"./document.pdf"}');
+        await cli['runCommand']('download-attachment', '{"attachmentId":"att123","outputPath":"./file.pdf"}');
 
-        expect(downloadAttachment).toHaveBeenCalledWith('cloud', 'att12345', './document.pdf');
+        expect(downloadAttachment).toHaveBeenCalledWith('att123', './file.pdf');
 
         consoleLogSpy.mockRestore();
       });
 
-      it('should execute get-user', async () => {
+      it('should execute get-user with accountId', async () => {
         const { getUser } = await import('../../../src/utils/index.js');
-        vi.mocked(getUser).mockResolvedValue({ success: true, result: '{"displayName":"User"}' });
+        vi.mocked(getUser).mockResolvedValue({ success: true, result: '{"displayName":"John Doe"}' });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
         await cli['runCommand']('get-user', '{"accountId":"123"}');
 
-        expect(getUser).toHaveBeenCalledWith('cloud', '123', undefined, 'json');
+        expect(getUser).toHaveBeenCalledWith('123', undefined, 'json');
+
+        consoleLogSpy.mockRestore();
+      });
+
+      it('should execute get-user with username', async () => {
+        const { getUser } = await import('../../../src/utils/index.js');
+        vi.mocked(getUser).mockResolvedValue({ success: true, result: '{"displayName":"Jane Doe"}' });
+        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        await cli['runCommand']('get-user', '{"username":"janedoe"}');
+
+        expect(getUser).toHaveBeenCalledWith(undefined, 'janedoe', 'json');
+
+        consoleLogSpy.mockRestore();
+      });
+
+      it('should execute get-user without parameters (current user)', async () => {
+        const { getUser } = await import('../../../src/utils/index.js');
+        vi.mocked(getUser).mockResolvedValue({ success: true, result: '{"displayName":"Current User"}' });
+        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        await cli['runCommand']('get-user', '{}');
+
+        expect(getUser).toHaveBeenCalledWith(undefined, undefined, 'json');
 
         consoleLogSpy.mockRestore();
       });
 
       it('should execute test-connection', async () => {
         const { testConnection } = await import('../../../src/utils/index.js');
-        vi.mocked(testConnection).mockResolvedValue({ success: true, result: 'Connected' });
+        vi.mocked(testConnection).mockResolvedValue({
+          success: true,
+          result: 'Connection successful!',
+        });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
         await cli['runCommand']('test-connection', '{}');
 
-        expect(testConnection).toHaveBeenCalledWith('cloud');
+        expect(testConnection).toHaveBeenCalledWith();
 
         consoleLogSpy.mockRestore();
       });
 
-      it('should use profile from args if provided', async () => {
-        const { listSpaces } = await import('../../../src/utils/index.js');
-        vi.mocked(listSpaces).mockResolvedValue({ success: true, result: '{}' });
-        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-        await cli['runCommand']('list-spaces', '{"profile":"staging"}');
-
-        expect(listSpaces).toHaveBeenCalledWith('staging', 'json');
-
-        consoleLogSpy.mockRestore();
-      });
-
-      it('should use format from args if provided', async () => {
-        const { listSpaces } = await import('../../../src/utils/index.js');
-        vi.mocked(listSpaces).mockResolvedValue({ success: true, result: '{}' });
-        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-        await cli['runCommand']('list-spaces', '{"format":"toon"}');
-
-        expect(listSpaces).toHaveBeenCalledWith('cloud', 'toon');
-
-        consoleLogSpy.mockRestore();
-      });
-
-      it('should use current profile and format by default', async () => {
+      it('should use current format by default', async () => {
         const { listSpaces } = await import('../../../src/utils/index.js');
         vi.mocked(listSpaces).mockResolvedValue({ success: true, result: '{}' });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
         await cli['runCommand']('list-spaces', '{}');
 
-        expect(listSpaces).toHaveBeenCalledWith('cloud', 'json');
+        expect(listSpaces).toHaveBeenCalledWith('json');
 
         consoleLogSpy.mockRestore();
       });
@@ -669,8 +616,9 @@ describe('cli/wrapper', () => {
       beforeEach(async () => {
         const { loadConfig } = await import('../../../src/utils/index.js');
         vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
+          host: 'https://test.atlassian.net',
+          email: 'test@test.com',
+          apiToken: 'token',
           defaultFormat: 'json',
         });
         const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -684,7 +632,6 @@ describe('cli/wrapper', () => {
         cli['printHelp']();
 
         expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Confluence CLI v0.0.0'));
-        expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Profile: cloud'));
         expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Format:  json'));
 
         consoleLogSpy.mockRestore();
@@ -695,8 +642,9 @@ describe('cli/wrapper', () => {
       beforeEach(async () => {
         const { loadConfig } = await import('../../../src/utils/index.js');
         vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
+          host: 'https://test.atlassian.net',
+          email: 'test@test.com',
+          apiToken: 'token',
           defaultFormat: 'json',
         });
       });
@@ -725,8 +673,9 @@ describe('cli/wrapper', () => {
       beforeEach(async () => {
         const { loadConfig } = await import('../../../src/utils/index.js');
         vi.mocked(loadConfig).mockReturnValue({
-          profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-          defaultProfile: 'cloud',
+          host: 'https://test.atlassian.net',
+          email: 'test@test.com',
+          apiToken: 'token',
           defaultFormat: 'json',
         });
       });

@@ -22,38 +22,24 @@ export interface ApiResult {
  */
 export class ConfluenceUtil {
   private config: Config;
-  private clientPool: Map<string, ConfluenceClient>;
-  private optionsPool: Map<string, ReturnType<typeof getConfluenceClientOptions>>;
+  private client: ConfluenceClient | null = null;
 
   constructor(config: Config) {
     this.config = config;
-    this.clientPool = new Map();
-    this.optionsPool = new Map();
   }
 
   /**
-   * Get or create Confluence client for a profile
+   * Get or create Confluence client
    */
-  getClient(profileName: string): ConfluenceClient {
-    if (this.clientPool.has(profileName)) {
-      return this.clientPool.get(profileName)!;
+  getClient(): ConfluenceClient {
+    if (this.client) {
+      return this.client;
     }
 
-    const options = getConfluenceClientOptions(this.config, profileName);
-    const client = new ConfluenceClient(options);
-    this.clientPool.set(profileName, client);
-    this.optionsPool.set(profileName, options);
+    const options = getConfluenceClientOptions(this.config);
+    this.client = new ConfluenceClient(options);
 
-    return client;
-  }
-
-  /**
-   * Get client options for a profile
-   */
-  getClientOptions(profileName: string): ReturnType<typeof getConfluenceClientOptions> {
-    // Ensure client is created (which also creates options)
-    this.getClient(profileName);
-    return this.optionsPool.get(profileName)!;
+    return this.client;
   }
 
   /**
@@ -87,9 +73,9 @@ export class ConfluenceUtil {
   /**
    * List all spaces
    */
-  async listSpaces(profileName: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
+  async listSpaces(format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
       const response = await client.space.getSpaces();
 
       // Simplify space data for display
@@ -118,9 +104,9 @@ export class ConfluenceUtil {
   /**
    * Get space details
    */
-  async getSpace(profileName: string, spaceKey: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
+  async getSpace(spaceKey: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
       const space = await client.space.getSpace({ spaceKey });
 
       return {
@@ -141,7 +127,6 @@ export class ConfluenceUtil {
    * List pages in a space or by CQL query
    */
   async listPages(
-    profileName: string,
     spaceKey?: string,
     title?: string,
     limit = 25,
@@ -150,7 +135,7 @@ export class ConfluenceUtil {
     format: 'json' | 'toon' = 'json'
   ): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
 
       // Build CQL query
       let cql = 'type=page';
@@ -198,9 +183,9 @@ export class ConfluenceUtil {
   /**
    * Get page details
    */
-  async getPage(profileName: string, pageId: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
+  async getPage(pageId: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
       const page = await client.content.getContentById({
         id: pageId,
         expand: ['body.storage', 'children.attachment'],
@@ -224,7 +209,6 @@ export class ConfluenceUtil {
    * Create a new page
    */
   async createPage(
-    profileName: string,
     spaceKey: string,
     title: string,
     body: string,
@@ -232,7 +216,7 @@ export class ConfluenceUtil {
     format: 'json' | 'toon' = 'json'
   ): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
 
       const contentBody: {
         type: 'page';
@@ -275,15 +259,9 @@ export class ConfluenceUtil {
   /**
    * Update an existing page
    */
-  async updatePage(
-    profileName: string,
-    pageId: string,
-    title: string,
-    body: string,
-    version: number
-  ): Promise<ApiResult> {
+  async updatePage(pageId: string, title: string, body: string, version: number): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
 
       await client.content.updateContent({
         id: pageId,
@@ -316,14 +294,9 @@ export class ConfluenceUtil {
   /**
    * Add a comment to a page
    */
-  async addComment(
-    profileName: string,
-    pageId: string,
-    body: string,
-    format: 'json' | 'toon' = 'json'
-  ): Promise<ApiResult> {
+  async addComment(pageId: string, body: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
 
       // First, get the page to find its space
       const page = await client.content.getContentById({
@@ -368,9 +341,9 @@ export class ConfluenceUtil {
   /**
    * Delete a page
    */
-  async deletePage(profileName: string, pageId: string): Promise<ApiResult> {
+  async deletePage(pageId: string): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
       await client.content.deleteContent({ id: pageId });
 
       return {
@@ -389,9 +362,9 @@ export class ConfluenceUtil {
   /**
    * Download an attachment from a page
    */
-  async downloadAttachment(profileName: string, attachmentId: string, outputPath?: string): Promise<ApiResult> {
+  async downloadAttachment(attachmentId: string, outputPath?: string): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
 
       // Get attachment metadata with container (parent content) information
       const attachment = await client.content.getContentById({
@@ -451,14 +424,9 @@ export class ConfluenceUtil {
   /**
    * Get user information
    */
-  async getUser(
-    profileName: string,
-    accountId?: string,
-    username?: string,
-    format: 'json' | 'toon' = 'json'
-  ): Promise<ApiResult> {
+  async getUser(accountId?: string, username?: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
 
       if (accountId) {
         const user = await client.users.getUser({ accountId });
@@ -505,15 +473,15 @@ export class ConfluenceUtil {
   /**
    * Test Confluence API connection
    */
-  async testConnection(profileName: string): Promise<ApiResult> {
+  async testConnection(): Promise<ApiResult> {
     try {
-      const client = this.getClient(profileName);
+      const client = this.getClient();
       const currentUser = await client.users.getCurrentUser();
 
       return {
         success: true,
         data: { currentUser },
-        result: `Connection successful!\n\nProfile: ${profileName}\nLogged in as: ${currentUser.displayName} (${currentUser.email})`,
+        result: `✅ Connection successful!\n\nLogged in as: ${currentUser.displayName} (${currentUser.email})`,
       };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -525,9 +493,9 @@ export class ConfluenceUtil {
   }
 
   /**
-   * Clear client pool (for cleanup)
+   * Clear client (for cleanup)
    */
   clearClients(): void {
-    this.clientPool.clear();
+    this.client = null;
   }
 }

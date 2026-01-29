@@ -10,6 +10,7 @@ import {
   listPages,
   listSpaces,
   loadConfig,
+  setupConfig,
   testConnection,
   updatePage,
 } from '../utils/index.js';
@@ -26,20 +27,25 @@ export const runCommand = async (
   _flag: string | null
 ): Promise<void> => {
   try {
-    // Load config to get default profile
-    const projectRoot = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
-    const config = loadConfig(projectRoot);
+    // Handle config command first (before loading config)
+    if (command === 'config') {
+      await setupConfig();
+      clearClients();
+      process.exit(0);
+    }
+
+    // Load config to get default format
+    const config = loadConfig();
 
     // Parse arguments
     const args = arg && arg.trim() !== '' ? JSON.parse(arg) : {};
-    const profile = args.profile || config.defaultProfile;
     const format = args.format || config.defaultFormat;
 
     let result;
 
     switch (command) {
       case 'list-spaces':
-        result = await listSpaces(profile, format);
+        result = await listSpaces(format);
         break;
 
       case 'get-space':
@@ -47,11 +53,11 @@ export const runCommand = async (
           console.error('ERROR: "spaceKey" parameter is required');
           process.exit(1);
         }
-        result = await getSpace(profile, args.spaceKey, format);
+        result = await getSpace(args.spaceKey, format);
         break;
 
       case 'list-pages':
-        result = await listPages(profile, args.spaceKey, args.title, args.limit, args.start, format);
+        result = await listPages(args.spaceKey, args.title, args.limit, args.start, format);
         break;
 
       case 'get-page':
@@ -59,7 +65,7 @@ export const runCommand = async (
           console.error('ERROR: "pageId" parameter is required');
           process.exit(1);
         }
-        result = await getPage(profile, args.pageId, format);
+        result = await getPage(args.pageId, format);
         break;
 
       case 'create-page':
@@ -67,7 +73,7 @@ export const runCommand = async (
           console.error('ERROR: "spaceKey", "title", and "body" parameters are required');
           process.exit(1);
         }
-        result = await createPage(profile, args.spaceKey, args.title, args.body, args.parentId, format);
+        result = await createPage(args.spaceKey, args.title, args.body, args.parentId, format);
         break;
 
       case 'update-page':
@@ -75,7 +81,7 @@ export const runCommand = async (
           console.error('ERROR: "pageId", "title", "body", and "version" parameters are required');
           process.exit(1);
         }
-        result = await updatePage(profile, args.pageId, args.title, args.body, args.version);
+        result = await updatePage(args.pageId, args.title, args.body, args.version);
         break;
 
       case 'add-comment':
@@ -83,7 +89,7 @@ export const runCommand = async (
           console.error('ERROR: "pageId" and "body" parameters are required');
           process.exit(1);
         }
-        result = await addComment(profile, args.pageId, args.body, format);
+        result = await addComment(args.pageId, args.body, format);
         break;
 
       case 'delete-page':
@@ -91,7 +97,7 @@ export const runCommand = async (
           console.error('ERROR: "pageId" parameter is required');
           process.exit(1);
         }
-        result = await deletePage(profile, args.pageId);
+        result = await deletePage(args.pageId);
         break;
 
       case 'download-attachment':
@@ -99,15 +105,15 @@ export const runCommand = async (
           console.error('ERROR: "attachmentId" parameter is required');
           process.exit(1);
         }
-        result = await downloadAttachment(profile, args.attachmentId, args.outputPath);
+        result = await downloadAttachment(args.attachmentId, args.outputPath);
         break;
 
       case 'get-user':
-        result = await getUser(profile, args.accountId, args.username, format);
+        result = await getUser(args.accountId, args.username, format);
         break;
 
       case 'test-connection':
-        result = await testConnection(profile);
+        result = await testConnection();
         break;
 
       default:
