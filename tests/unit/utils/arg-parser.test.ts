@@ -319,8 +319,8 @@ describe('arg-parser', () => {
       }
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Confluence CLI'));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('npx conni-cli'));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('npx conni-cli --commands'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('conni-cli'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('conni-cli --commands'));
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('list-spaces'));
 
       exitSpy.mockRestore();
@@ -340,8 +340,8 @@ describe('arg-parser', () => {
       }
 
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Examples:'));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('npx conni-cli list-spaces'));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('npx conni-cli get-page'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('conni-cli list-spaces'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('conni-cli get-page'));
 
       exitSpy.mockRestore();
       consoleLogSpy.mockRestore();

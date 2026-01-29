@@ -25,7 +25,6 @@ import type { Config } from '../utils/index.js';
 export class wrapper {
   private rl: readline.Interface;
   private config: Config | null = null;
-  private currentProfile: string | null = null;
   private currentFormat: 'json' | 'toon' = 'json';
 
   constructor() {
@@ -41,18 +40,12 @@ export class wrapper {
    */
   async connect(): Promise<void> {
     try {
-      const projectRoot = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
-      this.config = loadConfig(projectRoot);
-      this.currentProfile = this.config.defaultProfile;
+      this.config = loadConfig();
       this.currentFormat = this.config.defaultFormat;
-
       this.printHelp();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('Failed to load configuration:', errorMessage);
-      console.error('\nMake sure:');
-      console.error('1. .claude/atlassian-config.local.md exists');
-      console.error('2. The file contains valid Confluence profiles in YAML frontmatter');
+      console.error(errorMessage);
       process.exit(1);
     }
   }
@@ -93,19 +86,6 @@ export class wrapper {
       return;
     }
 
-    if (trimmed.startsWith('profile ')) {
-      const newProfile = trimmed.substring(8).trim();
-      if (this.config && this.config.profiles[newProfile]) {
-        this.currentProfile = newProfile;
-        console.log(`Switched to profile: ${newProfile}`);
-      } else {
-        const available = this.config ? Object.keys(this.config.profiles).join(', ') : 'none';
-        console.error(`ERROR: Profile "${newProfile}" not found. Available: ${available}`);
-      }
-      this.rl.prompt();
-      return;
-    }
-
     if (trimmed.startsWith('format ')) {
       const newFormat = trimmed.substring(7).trim() as 'json' | 'toon';
       if (['json', 'toon'].includes(newFormat)) {
@@ -113,18 +93,6 @@ export class wrapper {
         console.log(`Output format set to: ${newFormat}`);
       } else {
         console.error('ERROR: Invalid format. Choose: json or toon');
-      }
-      this.rl.prompt();
-      return;
-    }
-
-    if (trimmed === 'profiles') {
-      if (this.config) {
-        console.log('\nAvailable profiles:');
-        Object.keys(this.config.profiles).forEach((name, i) => {
-          const current = name === this.currentProfile ? ' (current)' : '';
-          console.log(`${i + 1}. ${name}${current}`);
-        });
       }
       this.rl.prompt();
       return;
@@ -147,10 +115,10 @@ export class wrapper {
   /**
    * Runs a Confluence command
    * @param command - The command name to execute
-   * @param arg - JSON string or null for the command arguments
+   * @param arg - JSON string or empty string for the command arguments
    */
   private async runCommand(command: string, arg: string): Promise<void> {
-    if (!this.config || !this.currentProfile) {
+    if (!this.config) {
       console.log('Configuration not loaded!');
       this.rl.prompt();
       return;
@@ -159,14 +127,13 @@ export class wrapper {
     try {
       // Parse arguments
       const args = arg && arg.trim() !== '' ? JSON.parse(arg) : {};
-      const profile = args.profile || this.currentProfile;
       const format = args.format || this.currentFormat;
 
       let result;
 
       switch (command) {
         case 'list-spaces':
-          result = await listSpaces(profile, format);
+          result = await listSpaces(format);
           break;
 
         case 'get-space':
@@ -175,11 +142,11 @@ export class wrapper {
             this.rl.prompt();
             return;
           }
-          result = await getSpace(profile, args.spaceKey, format);
+          result = await getSpace(args.spaceKey, format);
           break;
 
         case 'list-pages':
-          result = await listPages(profile, args.spaceKey, args.title, args.limit, args.start, format);
+          result = await listPages(args.spaceKey, args.title, args.limit, args.start, format);
           break;
 
         case 'get-page':
@@ -188,7 +155,7 @@ export class wrapper {
             this.rl.prompt();
             return;
           }
-          result = await getPage(profile, args.pageId, format);
+          result = await getPage(args.pageId, format);
           break;
 
         case 'create-page':
@@ -197,7 +164,7 @@ export class wrapper {
             this.rl.prompt();
             return;
           }
-          result = await createPage(profile, args.spaceKey, args.title, args.body, args.parentId, format);
+          result = await createPage(args.spaceKey, args.title, args.body, args.parentId, format);
           break;
 
         case 'update-page':
@@ -206,7 +173,7 @@ export class wrapper {
             this.rl.prompt();
             return;
           }
-          result = await updatePage(profile, args.pageId, args.title, args.body, args.version);
+          result = await updatePage(args.pageId, args.title, args.body, args.version);
           break;
 
         case 'add-comment':
@@ -215,7 +182,7 @@ export class wrapper {
             this.rl.prompt();
             return;
           }
-          result = await addComment(profile, args.pageId, args.body, format);
+          result = await addComment(args.pageId, args.body, format);
           break;
 
         case 'delete-page':
@@ -224,7 +191,7 @@ export class wrapper {
             this.rl.prompt();
             return;
           }
-          result = await deletePage(profile, args.pageId);
+          result = await deletePage(args.pageId);
           break;
 
         case 'download-attachment':
@@ -233,15 +200,15 @@ export class wrapper {
             this.rl.prompt();
             return;
           }
-          result = await downloadAttachment(profile, args.attachmentId, args.outputPath);
+          result = await downloadAttachment(args.attachmentId, args.outputPath);
           break;
 
         case 'get-user':
-          result = await getUser(profile, args.accountId, args.username, format);
+          result = await getUser(args.accountId, args.username, format);
           break;
 
         case 'test-connection':
-          result = await testConnection(profile);
+          result = await testConnection();
           break;
 
         default:
@@ -269,7 +236,6 @@ export class wrapper {
    */
   private printHelp(): void {
     const version = getCurrentVersion();
-    const currentProfile = this.currentProfile || 'none';
     const currentFormat = this.currentFormat;
     const commandList = COMMANDS.join(', ');
 
@@ -277,7 +243,6 @@ export class wrapper {
 Confluence CLI v${version}
 
 Current Settings:
-  Profile: ${currentProfile}
   Format:  ${currentFormat}
 
 Usage:
@@ -285,8 +250,6 @@ Usage:
 commands              list all available Confluence commands
 <command> -h          quick help on <command>
 <command> <arg>       run <command> with JSON argument
-profile <name>        switch to a different Confluence profile
-profiles              list all available profiles
 format <type>         set output format (json, toon)
 clear                 clear the screen
 exit, quit, q         exit the CLI

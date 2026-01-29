@@ -42,96 +42,86 @@ export const COMMANDS_INFO: string[] = [
 export const COMMANDS_DETAIL: string[] = [
   `
 Parameters:
-- profile (optional): string - Confluence profile name (default: configured default profile)
 - format (optional): string - Output format: json or toon (default: json)
 
 Example:
-list-spaces '{"profile":"cloud","format":"json"}'`,
+list-spaces '{"format":"json"}'`,
   `
 Parameters:
 - spaceKey (required): string - Space key
-- profile (optional): string - Confluence profile name (default: configured default profile)
 - format (optional): string - Output format: json or toon (default: json)
 
 Example:
-get-space '{"spaceKey":"DOCS","profile":"cloud","format":"json"}'`,
+get-space '{"spaceKey":"DOCS","format":"json"}'`,
   `
 Parameters:
 - spaceKey (optional): string - Space key to filter pages
 - title (optional): string - Title search string
 - limit (optional): number - Maximum number of results (default: 25)
 - start (optional): number - Starting index for pagination (default: 0)
-- profile (optional): string - Confluence profile name (default: configured default profile)
 - format (optional): string - Output format: json or toon (default: json)
 
 Example:
-list-pages '{"spaceKey":"DOCS","title":"Getting Started","limit":10,"profile":"cloud","format":"json"}'`,
+list-pages '{"spaceKey":"DOCS","title":"Getting Started","limit":10,"format":"json"}'`,
   `
 Parameters:
 - pageId (required): string - Page ID
-- profile (optional): string - Confluence profile name (default: configured default profile)
 - format (optional): string - Output format: json or toon (default: json)
 
 Example:
-get-page '{"pageId":"123456","profile":"cloud","format":"json"}'`,
+get-page '{"pageId":"123456","format":"json"}'`,
   `
 Parameters:
 - spaceKey (required): string - Space key where the page will be created
 - title (required): string - Page title
 - body (required): string - Page body content in storage format (XHTML)
 - parentId (optional): string - Parent page ID for nested pages
-- profile (optional): string - Confluence profile name (default: configured default profile)
 - format (optional): string - Output format: json or toon (default: json)
 
 Example:
-create-page '{"spaceKey":"DOCS","title":"New Page","body":"<p>Hello World</p>","profile":"cloud","format":"json"}'`,
+create-page '{"spaceKey":"DOCS","title":"New Page","body":"<p>Hello World</p>","format":"json"}'`,
   `
 Parameters:
 - pageId (required): string - Page ID to update
 - title (required): string - New page title
 - body (required): string - New page body content in storage format (XHTML)
 - version (required): number - Current page version number
-- profile (optional): string - Confluence profile name (default: configured default profile)
 
 Example:
-update-page '{"pageId":"123456","title":"Updated Title","body":"<p>Updated content</p>","version":1,"profile":"cloud"}'`,
+update-page '{"pageId":"123456","title":"Updated Title","body":"<p>Updated content</p>","version":1}'`,
   `
 Parameters:
 - pageId (required): string - Page ID to add comment to
 - body (required): string - Comment body content in storage format (XHTML)
-- profile (optional): string - Confluence profile name (default: configured default profile)
 - format (optional): string - Output format: json or toon (default: json)
 
 Example:
-add-comment '{"pageId":"123456","body":"<p>Great article!</p>","profile":"cloud"}'`,
+add-comment '{"pageId":"123456","body":"<p>Great article!</p>"}'`,
   `
 Parameters:
 - pageId (required): string - Page ID to delete
-- profile (optional): string - Confluence profile name (default: configured default profile)
 
 Example:
-delete-page '{"pageId":"123456","profile":"cloud"}'`,
+delete-page '{"pageId":"123456"}'`,
   `
 Parameters:
 - attachmentId (required): string - Attachment ID to download
 - outputPath (optional): string - Path to save the file (default: current directory with original filename)
-- profile (optional): string - Confluence profile name (default: configured default profile)
 
 Example:
-download-attachment '{"attachmentId":"att12345","outputPath":"./document.pdf","profile":"cloud"}'`,
+download-attachment '{"attachmentId":"att12345","outputPath":"./document.pdf"}'`,
   `
 Parameters:
 - accountId (optional): string - User account ID
 - username (optional): string - Username to search for
-- profile (optional): string - Confluence profile name (default: configured default profile)
 - format (optional): string - Output format: json or toon (default: json)
 
 Example:
-get-user '{"accountId":"5b10a2844c20165700ede21g","profile":"cloud","format":"json"}'`,
+get-user '{"accountId":"5b10a2844c20165700ede21g","format":"json"}'`,
   `
 Parameters:
-- profile (optional): string - Confluence profile name (default: configured default profile)
+- (none)
 
 Example:
-test-connection '{"profile":"cloud"}'`,
+test-connection`,
 ];

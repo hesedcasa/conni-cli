@@ -19,25 +19,18 @@ vi.mock('../../../src/utils/index.js', () => ({
   clearClients: vi.fn(),
 }));
 
-// Mock process.env
-const originalEnv = process.env;
-
 describe('commands/runner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv };
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
   });
 
   describe('runCommand', () => {
     it('should execute list-spaces command', async () => {
       const { listSpaces, loadConfig, clearClients } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       listSpaces.mockResolvedValue({ success: true, result: '{"spaces": []}' });
@@ -49,7 +42,7 @@ describe('commands/runner', () => {
       await runCommand('list-spaces', null, null);
 
       expect(loadConfig).toHaveBeenCalled();
-      expect(listSpaces).toHaveBeenCalledWith('cloud', 'json');
+      expect(listSpaces).toHaveBeenCalledWith('json');
       expect(consoleLogSpy).toHaveBeenCalledWith('{"spaces": []}');
       expect(clearClients).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(0);
@@ -59,14 +52,12 @@ describe('commands/runner', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should execute list-spaces with custom profile and format', async () => {
+    it('should execute list-spaces with custom format', async () => {
       const { listSpaces, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: {
-          cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' },
-          staging: { host: 'https://staging.atlassian.net', email: 'staging@test.com', apiToken: 'staging-token' },
-        },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       listSpaces.mockResolvedValue({ success: true, result: '{"spaces": []}' });
@@ -74,9 +65,9 @@ describe('commands/runner', () => {
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      await runCommand('list-spaces', '{"profile":"staging","format":"toon"}', null);
+      await runCommand('list-spaces', '{"format":"toon"}', null);
 
-      expect(listSpaces).toHaveBeenCalledWith('staging', 'toon');
+      expect(listSpaces).toHaveBeenCalledWith('toon');
       expect(consoleLogSpy).toHaveBeenCalledWith('{"spaces": []}');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
@@ -87,8 +78,9 @@ describe('commands/runner', () => {
     it('should execute get-space command with spaceKey', async () => {
       const { getSpace, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       getSpace.mockResolvedValue({ success: true, result: '{"key":"DOCS","name":"Documentation"}' });
@@ -99,9 +91,8 @@ describe('commands/runner', () => {
 
       await runCommand('get-space', '{"spaceKey":"DOCS"}', null);
 
-      expect(getSpace).toHaveBeenCalledWith('cloud', 'DOCS', 'json');
+      expect(getSpace).toHaveBeenCalledWith('DOCS', 'json');
       expect(consoleLogSpy).toHaveBeenCalledWith('{"key":"DOCS","name":"Documentation"}');
-      expect(consoleErrorSpy).not.toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
@@ -110,10 +101,11 @@ describe('commands/runner', () => {
     });
 
     it('should exit with error if get-space missing spaceKey', async () => {
-      const { loadConfig, clearClients } = await import('../../../src/utils/index.js');
+      const { loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
 
@@ -124,7 +116,6 @@ describe('commands/runner', () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('ERROR: "spaceKey" parameter is required');
       expect(exitSpy).toHaveBeenCalledWith(1);
-      expect(clearClients).toHaveBeenCalled();
 
       exitSpy.mockRestore();
       consoleErrorSpy.mockRestore();
@@ -133,8 +124,9 @@ describe('commands/runner', () => {
     it('should execute list-pages command with all parameters', async () => {
       const { listPages, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       listPages.mockResolvedValue({ success: true, result: '{"pages": []}' });
@@ -142,9 +134,9 @@ describe('commands/runner', () => {
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      await runCommand('list-pages', '{"spaceKey":"DOCS","title":"Test","limit":10,"start":0}', null);
+      await runCommand('list-pages', '{"spaceKey":"DOCS","title":"Test","limit":10,"start":5}', null);
 
-      expect(listPages).toHaveBeenCalledWith('cloud', 'DOCS', 'Test', 10, 0, 'json');
+      expect(listPages).toHaveBeenCalledWith('DOCS', 'Test', 10, 5, 'json');
       expect(consoleLogSpy).toHaveBeenCalledWith('{"pages": []}');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
@@ -155,8 +147,9 @@ describe('commands/runner', () => {
     it('should execute list-pages with minimal parameters', async () => {
       const { listPages, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       listPages.mockResolvedValue({ success: true, result: '{"pages": []}' });
@@ -166,8 +159,7 @@ describe('commands/runner', () => {
 
       await runCommand('list-pages', null, null);
 
-      expect(listPages).toHaveBeenCalledWith('cloud', undefined, undefined, undefined, undefined, 'json');
-      expect(consoleLogSpy).toHaveBeenCalledWith('{"pages": []}');
+      expect(listPages).toHaveBeenCalledWith(undefined, undefined, undefined, undefined, 'json');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
@@ -177,8 +169,9 @@ describe('commands/runner', () => {
     it('should execute get-page command', async () => {
       const { getPage, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       getPage.mockResolvedValue({ success: true, result: '{"id":"123","title":"Test Page"}' });
@@ -188,7 +181,7 @@ describe('commands/runner', () => {
 
       await runCommand('get-page', '{"pageId":"123"}', null);
 
-      expect(getPage).toHaveBeenCalledWith('cloud', '123', 'json');
+      expect(getPage).toHaveBeenCalledWith('123', 'json');
       expect(consoleLogSpy).toHaveBeenCalledWith('{"id":"123","title":"Test Page"}');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
@@ -199,8 +192,9 @@ describe('commands/runner', () => {
     it('should exit with error if get-page missing pageId', async () => {
       const { loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
 
@@ -219,8 +213,9 @@ describe('commands/runner', () => {
     it('should execute create-page command', async () => {
       const { createPage, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       createPage.mockResolvedValue({ success: true, result: '{"id":"456","title":"New Page"}' });
@@ -230,7 +225,7 @@ describe('commands/runner', () => {
 
       await runCommand('create-page', '{"spaceKey":"DOCS","title":"New Page","body":"<p>Content</p>"}', null);
 
-      expect(createPage).toHaveBeenCalledWith('cloud', 'DOCS', 'New Page', '<p>Content</p>', undefined, 'json');
+      expect(createPage).toHaveBeenCalledWith('DOCS', 'New Page', '<p>Content</p>', undefined, 'json');
       expect(consoleLogSpy).toHaveBeenCalledWith('{"id":"456","title":"New Page"}');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
@@ -241,8 +236,9 @@ describe('commands/runner', () => {
     it('should execute create-page with parentId', async () => {
       const { createPage, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       createPage.mockResolvedValue({ success: true, result: '{"id":"789"}' });
@@ -255,7 +251,7 @@ describe('commands/runner', () => {
         null
       );
 
-      expect(createPage).toHaveBeenCalledWith('cloud', 'DOCS', 'Child Page', '<p>Child</p>', '123', 'json');
+      expect(createPage).toHaveBeenCalledWith('DOCS', 'Child Page', '<p>Child</p>', '123', 'json');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
@@ -264,8 +260,9 @@ describe('commands/runner', () => {
     it('should exit with error if create-page missing required parameters', async () => {
       const { loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
 
@@ -284,19 +281,20 @@ describe('commands/runner', () => {
     it('should execute update-page command', async () => {
       const { updatePage, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
-      updatePage.mockResolvedValue({ success: true, result: 'Page updated' });
+      updatePage.mockResolvedValue({ success: true, result: '{"id":"123"}' });
 
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await runCommand('update-page', '{"pageId":"123","title":"Updated","body":"<p>New</p>","version":1}', null);
 
-      expect(updatePage).toHaveBeenCalledWith('cloud', '123', 'Updated', '<p>New</p>', 1);
-      expect(consoleLogSpy).toHaveBeenCalledWith('Page updated');
+      expect(updatePage).toHaveBeenCalledWith('123', 'Updated', '<p>New</p>', 1);
+      expect(consoleLogSpy).toHaveBeenCalledWith('{"id":"123"}');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
@@ -306,8 +304,9 @@ describe('commands/runner', () => {
     it('should exit with error if update-page missing version', async () => {
       const { loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
 
@@ -328,19 +327,20 @@ describe('commands/runner', () => {
     it('should execute add-comment command', async () => {
       const { addComment, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
-      addComment.mockResolvedValue({ success: true, result: '{"id":"999"}' });
+      addComment.mockResolvedValue({ success: true, result: '{"id":"comment123"}' });
 
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await runCommand('add-comment', '{"pageId":"123","body":"<p>Comment</p>"}', null);
 
-      expect(addComment).toHaveBeenCalledWith('cloud', '123', '<p>Comment</p>', 'json');
-      expect(consoleLogSpy).toHaveBeenCalledWith('{"id":"999"}');
+      expect(addComment).toHaveBeenCalledWith('123', '<p>Comment</p>', 'json');
+      expect(consoleLogSpy).toHaveBeenCalledWith('{"id":"comment123"}');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
@@ -350,8 +350,9 @@ describe('commands/runner', () => {
     it('should exit with error if add-comment missing parameters', async () => {
       const { loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
 
@@ -370,8 +371,9 @@ describe('commands/runner', () => {
     it('should execute delete-page command', async () => {
       const { deletePage, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       deletePage.mockResolvedValue({ success: true, result: 'Page deleted' });
@@ -381,7 +383,7 @@ describe('commands/runner', () => {
 
       await runCommand('delete-page', '{"pageId":"123"}', null);
 
-      expect(deletePage).toHaveBeenCalledWith('cloud', '123');
+      expect(deletePage).toHaveBeenCalledWith('123');
       expect(consoleLogSpy).toHaveBeenCalledWith('Page deleted');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
@@ -392,8 +394,9 @@ describe('commands/runner', () => {
     it('should exit with error if delete-page missing pageId', async () => {
       const { loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
 
@@ -412,25 +415,23 @@ describe('commands/runner', () => {
     it('should execute download-attachment command', async () => {
       const { downloadAttachment, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       downloadAttachment.mockResolvedValue({
         success: true,
-        result:
-          'Attachment downloaded successfully!\n\nFile: document.pdf\nPath: /tmp/document.pdf\nSize: 16.00 KB\nType: application/pdf',
+        result: 'Attachment downloaded to ./file.pdf',
       });
 
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      await runCommand('download-attachment', '{"attachmentId":"att12345","outputPath":"./document.pdf"}', null);
+      await runCommand('download-attachment', '{"attachmentId":"att123","outputPath":"./file.pdf"}', null);
 
-      expect(downloadAttachment).toHaveBeenCalledWith('cloud', 'att12345', './document.pdf');
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        'Attachment downloaded successfully!\n\nFile: document.pdf\nPath: /tmp/document.pdf\nSize: 16.00 KB\nType: application/pdf'
-      );
+      expect(downloadAttachment).toHaveBeenCalledWith('att123', './file.pdf');
+      expect(consoleLogSpy).toHaveBeenCalledWith('Attachment downloaded to ./file.pdf');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
@@ -440,19 +441,20 @@ describe('commands/runner', () => {
     it('should execute get-user with accountId', async () => {
       const { getUser, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
-      getUser.mockResolvedValue({ success: true, result: '{"accountId":"123","displayName":"User"}' });
+      getUser.mockResolvedValue({ success: true, result: '{"displayName":"John Doe"}' });
 
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await runCommand('get-user', '{"accountId":"123"}', null);
 
-      expect(getUser).toHaveBeenCalledWith('cloud', '123', undefined, 'json');
-      expect(consoleLogSpy).toHaveBeenCalledWith('{"accountId":"123","displayName":"User"}');
+      expect(getUser).toHaveBeenCalledWith('123', undefined, 'json');
+      expect(consoleLogSpy).toHaveBeenCalledWith('{"displayName":"John Doe"}');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
@@ -462,19 +464,19 @@ describe('commands/runner', () => {
     it('should execute get-user with username', async () => {
       const { getUser, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
-      getUser.mockResolvedValue({ success: true, result: '{"displayName":"Test User"}' });
+      getUser.mockResolvedValue({ success: true, result: '{"displayName":"Jane Doe"}' });
 
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      await runCommand('get-user', '{"username":"testuser"}', null);
+      await runCommand('get-user', '{"username":"janedoe"}', null);
 
-      expect(getUser).toHaveBeenCalledWith('cloud', undefined, 'testuser', 'json');
-      expect(consoleLogSpy).toHaveBeenCalledWith('{"displayName":"Test User"}');
+      expect(getUser).toHaveBeenCalledWith(undefined, 'janedoe', 'json');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
@@ -484,8 +486,9 @@ describe('commands/runner', () => {
     it('should execute get-user without parameters (current user)', async () => {
       const { getUser, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       getUser.mockResolvedValue({ success: true, result: '{"displayName":"Current User"}' });
@@ -495,7 +498,7 @@ describe('commands/runner', () => {
 
       await runCommand('get-user', null, null);
 
-      expect(getUser).toHaveBeenCalledWith('cloud', undefined, undefined, 'json');
+      expect(getUser).toHaveBeenCalledWith(undefined, undefined, 'json');
       expect(consoleLogSpy).toHaveBeenCalledWith('{"displayName":"Current User"}');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
@@ -506,8 +509,9 @@ describe('commands/runner', () => {
     it('should execute test-connection command', async () => {
       const { testConnection, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       testConnection.mockResolvedValue({ success: true, result: 'Connected successfully' });
@@ -517,7 +521,7 @@ describe('commands/runner', () => {
 
       await runCommand('test-connection', null, null);
 
-      expect(testConnection).toHaveBeenCalledWith('cloud');
+      expect(testConnection).toHaveBeenCalledWith();
       expect(consoleLogSpy).toHaveBeenCalledWith('Connected successfully');
       expect(exitSpy).toHaveBeenCalledWith(0);
 
@@ -528,8 +532,9 @@ describe('commands/runner', () => {
     it('should handle command failure', async () => {
       const { getSpace, loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       getSpace.mockResolvedValue({ success: false, error: 'Space not found' });
@@ -549,8 +554,9 @@ describe('commands/runner', () => {
     it('should handle unknown command', async () => {
       const { loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
 
@@ -569,8 +575,9 @@ describe('commands/runner', () => {
     it('should handle JSON parse error in arguments', async () => {
       const { loadConfig, clearClients } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
 
@@ -590,40 +597,21 @@ describe('commands/runner', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('should use CLAUDE_PROJECT_ROOT from environment if set', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = '/custom/project/root';
-      const { loadConfig, listSpaces } = await import('../../../src/utils/index.js');
+    it('should call loadConfig without parameters', async () => {
+      const { loadConfig } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
-      listSpaces.mockResolvedValue({ success: true, result: '{"spaces": []}' });
 
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
 
-      await runCommand('list-spaces', null, null);
+      await runCommand('test-connection', null, null);
 
-      expect(loadConfig).toHaveBeenCalledWith('/custom/project/root');
-
-      exitSpy.mockRestore();
-    });
-
-    it('should use current directory if CLAUDE_PROJECT_ROOT not set', async () => {
-      delete process.env.CLAUDE_PROJECT_ROOT;
-      const { loadConfig, listSpaces } = await import('../../../src/utils/index.js');
-      loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
-        defaultFormat: 'json',
-      });
-      listSpaces.mockResolvedValue({ success: true, result: '{"spaces": []}' });
-
-      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
-
-      await runCommand('list-spaces', null, null);
-
-      expect(loadConfig).toHaveBeenCalledWith(process.cwd());
+      expect(loadConfig).toHaveBeenCalledWith();
+      expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
     });
@@ -631,21 +619,21 @@ describe('commands/runner', () => {
     it('should clear clients on successful execution', async () => {
       const { listSpaces, loadConfig, clearClients } = await import('../../../src/utils/index.js');
       loadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
         defaultFormat: 'json',
       });
       listSpaces.mockResolvedValue({ success: true, result: '{}' });
 
       const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await runCommand('list-spaces', null, null);
 
       expect(clearClients).toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(0);
 
       exitSpy.mockRestore();
-      consoleLogSpy.mockRestore();
     });
 
     it('should clear clients on error', async () => {

@@ -1,22 +1,28 @@
 import * as fs from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getConfluenceClientOptions } from '../../../src/utils/config-loader.js';
+// Import the mocked module to access mocked functions
+import * as configLoaderModule from '../../../src/utils/config-loader.js';
 import { ConfluenceUtil } from '../../../src/utils/confluence-utils.js';
 
-// Mock @toon-format/toon
+// Import mocked modules
 vi.mock('@toon-format/toon', () => ({
   encode: vi.fn().mockReturnValue('toon-encoded-output'),
 }));
-// Mock config-loader
+
 vi.mock('../../../src/utils/config-loader.js', async () => {
-  const actual = await vi.importActual('../../../src/utils/config-loader.js');
+  const actual = await vi.importActual<typeof import('../../../src/utils/config-loader.js')>(
+    '../../../src/utils/config-loader.js'
+  );
   return {
     ...actual,
-    getConfluenceClientOptions: vi.fn(),
+    getConfluenceClientOptions: vi.fn().mockReturnValue({
+      host: 'https://test.atlassian.net',
+      authentication: { basic: { email: 'test@test.com', apiToken: 'token' } },
+    }),
   };
 });
-// Mock fs module
+
 vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
 }));
@@ -125,12 +131,10 @@ describe('confluence-utils', () => {
   describe('ConfluenceUtil', () => {
     let confluenceUtil: ConfluenceUtil;
     const mockConfig = {
-      profiles: {
-        cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' },
-        staging: { host: 'https://staging.atlassian.net', email: 'staging@test.com', apiToken: 'staging-token' },
-      },
-      defaultProfile: 'cloud',
-      defaultFormat: 'json',
+      host: 'https://test.atlassian.net',
+      email: 'test@test.com',
+      apiToken: 'token',
+      defaultFormat: 'json' as const,
     };
 
     beforeEach(() => {
@@ -138,25 +142,23 @@ describe('confluence-utils', () => {
     });
 
     describe('constructor', () => {
-      it('should initialize with config and empty client pool', () => {
+      it('should initialize with config and null client', () => {
         expect(confluenceUtil).toBeDefined();
         // @ts-expect-error - accessing private property for testing
-        expect(confluenceUtil.clientPool).toBeDefined();
-        // @ts-expect-error - accessing private property for testing
-        expect(confluenceUtil.clientPool.size).toBe(0);
+        expect(confluenceUtil.client).toBeNull();
       });
     });
 
     describe('getClient', () => {
-      it('should create client for new profile', () => {
-        getConfluenceClientOptions.mockReturnValue({
+      it('should create client', () => {
+        vi.mocked(configLoaderModule.getConfluenceClientOptions).mockReturnValue({
           host: 'https://test.atlassian.net',
           authentication: { basic: { email: 'test@test.com', apiToken: 'token' } },
         });
 
-        const client = confluenceUtil.getClient('cloud');
+        const client = confluenceUtil.getClient();
 
-        expect(getConfluenceClientOptions).toHaveBeenCalledWith(mockConfig, 'cloud');
+        expect(configLoaderModule.getConfluenceClientOptions).toHaveBeenCalledWith(mockConfig);
         expect(ConfluenceClient).toHaveBeenCalled();
         // Verify client has the expected structure (from mockClient)
         expect(client.space).toBeDefined();
@@ -164,39 +166,20 @@ describe('confluence-utils', () => {
         expect(client.users).toBeDefined();
       });
 
-      it('should reuse existing client from pool', () => {
-        getConfluenceClientOptions.mockReturnValue({
+      it('should reuse existing client', () => {
+        vi.mocked(configLoaderModule.getConfluenceClientOptions).mockReturnValue({
           host: 'https://test.atlassian.net',
           authentication: { basic: { email: 'test@test.com', apiToken: 'token' } },
         });
 
         // First call creates client
-        const client1 = confluenceUtil.getClient('cloud');
+        const client1 = confluenceUtil.getClient();
         // Second call reuses client
-        const client2 = confluenceUtil.getClient('cloud');
+        const client2 = confluenceUtil.getClient();
 
         expect(ConfluenceClient).toHaveBeenCalledTimes(1);
-        // Should be the exact same object reference (from pool)
+        // Should be the exact same object reference
         expect(client2).toBe(client1);
-      });
-
-      it('should create separate clients for different profiles', () => {
-        getConfluenceClientOptions
-          .mockReturnValueOnce({
-            host: 'https://test.atlassian.net',
-            authentication: { basic: { email: 'test@test.com', apiToken: 'token' } },
-          })
-          .mockReturnValueOnce({
-            host: 'https://staging.atlassian.net',
-            authentication: { basic: { email: 'staging@test.com', apiToken: 'staging-token' } },
-          });
-
-        const client1 = confluenceUtil.getClient('cloud');
-        const client2 = confluenceUtil.getClient('staging');
-
-        // Should be different objects (separate profiles)
-        expect(client1).not.toBe(client2);
-        expect(ConfluenceClient).toHaveBeenCalledTimes(2);
       });
     });
 
@@ -273,7 +256,7 @@ describe('confluence-utils', () => {
           results: [{ key: 'DOCS', name: 'Documentation', type: 'global', id: 1 }],
         });
 
-        const result = await confluenceUtil.listSpaces('cloud', 'json');
+        const result = await confluenceUtil.listSpaces('json');
 
         expect(mockClient.space.getSpaces).toHaveBeenCalled();
         expect(result.success).toBe(true);
@@ -285,7 +268,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.space.getSpaces.mockRejectedValue(new Error('API Error'));
 
-        const result = await confluenceUtil.listSpaces('cloud');
+        const result = await confluenceUtil.listSpaces();
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: API Error');
@@ -296,16 +279,16 @@ describe('confluence-utils', () => {
           results: [{ key: 'DOCS', name: 'Documentation', type: 'global', id: 1, extraField: 'ignored' }],
         });
 
-        const result = await confluenceUtil.listSpaces('cloud');
+        const result = await confluenceUtil.listSpaces();
 
         expect(result.data).toEqual([{ key: 'DOCS', name: 'Documentation', type: 'global', id: '1' }]);
-        expect(result.data[0]).not.toHaveProperty('extraField');
+        expect((result.data as Array<Record<string, unknown>>)[0]).not.toHaveProperty('extraField');
       });
 
       it('should handle empty results', async () => {
         mockClient.space.getSpaces.mockResolvedValue({ results: [] });
 
-        const result = await confluenceUtil.listSpaces('cloud');
+        const result = await confluenceUtil.listSpaces();
 
         expect(result.success).toBe(true);
         expect(result.data).toEqual([]);
@@ -317,7 +300,7 @@ describe('confluence-utils', () => {
         const mockSpace = { key: 'DOCS', name: 'Documentation', type: 'global' };
         mockClient.space.getSpace.mockResolvedValue(mockSpace);
 
-        const result = await confluenceUtil.getSpace('cloud', 'DOCS', 'json');
+        const result = await confluenceUtil.getSpace('DOCS', 'json');
 
         expect(mockClient.space.getSpace).toHaveBeenCalledWith({ spaceKey: 'DOCS' });
         expect(result.success).toBe(true);
@@ -327,7 +310,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.space.getSpace.mockRejectedValue(new Error('Space not found'));
 
-        const result = await confluenceUtil.getSpace('cloud', 'INVALID');
+        const result = await confluenceUtil.getSpace('INVALID');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Space not found');
@@ -343,7 +326,7 @@ describe('confluence-utils', () => {
           ],
         });
 
-        const result = await confluenceUtil.listPages('cloud', 'DOCS', 'Test', 10, 0, 'json');
+        const result = await confluenceUtil.listPages('DOCS', 'Test', 10, 0, 'json');
 
         expect(mockClient.content.searchContentByCQL).toHaveBeenCalledWith({
           cql: 'type=page AND space="DOCS" AND title~"Test"',
@@ -359,7 +342,7 @@ describe('confluence-utils', () => {
       it('should build CQL query with spaceKey only', async () => {
         mockClient.content.searchContentByCQL.mockResolvedValue({ results: [] });
 
-        await confluenceUtil.listPages('cloud', 'DOCS');
+        await confluenceUtil.listPages('DOCS');
 
         expect(mockClient.content.searchContentByCQL).toHaveBeenCalledWith({
           cql: 'type=page AND space="DOCS"',
@@ -370,7 +353,7 @@ describe('confluence-utils', () => {
       it('should build CQL query with title only', async () => {
         mockClient.content.searchContentByCQL.mockResolvedValue({ results: [] });
 
-        await confluenceUtil.listPages('cloud', undefined, 'Test');
+        await confluenceUtil.listPages(undefined, 'Test');
 
         expect(mockClient.content.searchContentByCQL).toHaveBeenCalledWith({
           cql: 'type=page AND title~"Test"',
@@ -381,7 +364,7 @@ describe('confluence-utils', () => {
       it('should build minimal CQL query without filters', async () => {
         mockClient.content.searchContentByCQL.mockResolvedValue({ results: [] });
 
-        await confluenceUtil.listPages('cloud');
+        await confluenceUtil.listPages();
 
         expect(mockClient.content.searchContentByCQL).toHaveBeenCalledWith({
           cql: 'type=page',
@@ -392,7 +375,7 @@ describe('confluence-utils', () => {
       it('should handle API errors', async () => {
         mockClient.content.searchContentByCQL.mockRejectedValue(new Error('Search failed'));
 
-        const result = await confluenceUtil.listPages('cloud', 'DOCS');
+        const result = await confluenceUtil.listPages('DOCS');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Search failed');
@@ -404,7 +387,7 @@ describe('confluence-utils', () => {
         const mockPage = { id: '123', title: 'Test Page', body: { storage: { value: '<p>Content</p>' } } };
         mockClient.content.getContentById.mockResolvedValue(mockPage);
 
-        const result = await confluenceUtil.getPage('cloud', '123', 'json');
+        const result = await confluenceUtil.getPage('123', 'json');
 
         expect(mockClient.content.getContentById).toHaveBeenCalledWith({
           id: '123',
@@ -417,7 +400,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.content.getContentById.mockRejectedValue(new Error('Page not found'));
 
-        const result = await confluenceUtil.getPage('cloud', '999');
+        const result = await confluenceUtil.getPage('999');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Page not found');
@@ -429,14 +412,7 @@ describe('confluence-utils', () => {
         const mockResponse = { id: '456', title: 'New Page' };
         mockClient.content.createContent.mockResolvedValue(mockResponse);
 
-        const result = await confluenceUtil.createPage(
-          'cloud',
-          'DOCS',
-          'New Page',
-          '<p>Content</p>',
-          undefined,
-          'json'
-        );
+        const result = await confluenceUtil.createPage('DOCS', 'New Page', '<p>Content</p>', undefined, 'json');
 
         expect(mockClient.content.createContent).toHaveBeenCalledWith({
           type: 'page',
@@ -457,7 +433,7 @@ describe('confluence-utils', () => {
         const mockResponse = { id: '789' };
         mockClient.content.createContent.mockResolvedValue(mockResponse);
 
-        await confluenceUtil.createPage('cloud', 'DOCS', 'Child Page', '<p>Child</p>', '123', 'json');
+        await confluenceUtil.createPage('DOCS', 'Child Page', '<p>Child</p>', '123', 'json');
 
         expect(mockClient.content.createContent).toHaveBeenCalledWith({
           type: 'page',
@@ -476,7 +452,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.content.createContent.mockRejectedValue(new Error('Permission denied'));
 
-        const result = await confluenceUtil.createPage('cloud', 'DOCS', 'New Page', '<p>Content</p>');
+        const result = await confluenceUtil.createPage('DOCS', 'New Page', '<p>Content</p>');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Permission denied');
@@ -487,7 +463,7 @@ describe('confluence-utils', () => {
       it('should update page with new version', async () => {
         mockClient.content.updateContent.mockResolvedValue({});
 
-        const result = await confluenceUtil.updatePage('cloud', '123', 'Updated Title', '<p>New Content</p>', 1);
+        const result = await confluenceUtil.updatePage('123', 'Updated Title', '<p>New Content</p>', 1);
 
         expect(mockClient.content.updateContent).toHaveBeenCalledWith({
           id: '123',
@@ -508,7 +484,7 @@ describe('confluence-utils', () => {
       it('should increment version number', async () => {
         mockClient.content.updateContent.mockResolvedValue({});
 
-        await confluenceUtil.updatePage('cloud', '123', 'Title', 'Body', 5);
+        await confluenceUtil.updatePage('123', 'Title', 'Body', 5);
 
         expect(mockClient.content.updateContent).toHaveBeenCalledWith(
           expect.objectContaining({ version: { number: 6 } })
@@ -518,7 +494,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.content.updateContent.mockRejectedValue(new Error('Version conflict'));
 
-        const result = await confluenceUtil.updatePage('cloud', '123', 'Title', 'Body', 1);
+        const result = await confluenceUtil.updatePage('123', 'Title', 'Body', 1);
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Version conflict');
@@ -532,7 +508,7 @@ describe('confluence-utils', () => {
         mockClient.content.getContentById.mockResolvedValue(mockPage);
         mockClient.content.createContent.mockResolvedValue(mockComment);
 
-        const result = await confluenceUtil.addComment('cloud', '123', '<p>Comment</p>', 'json');
+        const result = await confluenceUtil.addComment('123', '<p>Comment</p>', 'json');
 
         expect(mockClient.content.getContentById).toHaveBeenCalledWith({
           id: '123',
@@ -557,7 +533,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.content.getContentById.mockRejectedValue(new Error('Page not found'));
 
-        const result = await confluenceUtil.addComment('cloud', '999', '<p>Comment</p>');
+        const result = await confluenceUtil.addComment('999', '<p>Comment</p>');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Page not found');
@@ -568,7 +544,7 @@ describe('confluence-utils', () => {
       it('should delete page successfully', async () => {
         mockClient.content.deleteContent.mockResolvedValue({});
 
-        const result = await confluenceUtil.deletePage('cloud', '123');
+        const result = await confluenceUtil.deletePage('123');
 
         expect(mockClient.content.deleteContent).toHaveBeenCalledWith({ id: '123' });
         expect(result.success).toBe(true);
@@ -578,7 +554,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.content.deleteContent.mockRejectedValue(new Error('Delete failed'));
 
-        const result = await confluenceUtil.deletePage('cloud', '123');
+        const result = await confluenceUtil.deletePage('123');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Delete failed');
@@ -590,7 +566,7 @@ describe('confluence-utils', () => {
         const mockUser = { accountId: '123', displayName: 'Test User' };
         mockClient.users.getUser.mockResolvedValue(mockUser);
 
-        const result = await confluenceUtil.getUser('cloud', '123', undefined, 'json');
+        const result = await confluenceUtil.getUser('123', undefined, 'json');
 
         expect(mockClient.users.getUser).toHaveBeenCalledWith({ accountId: '123' });
         expect(result.success).toBe(true);
@@ -601,7 +577,7 @@ describe('confluence-utils', () => {
         const mockUser = { displayName: 'Test User' };
         mockClient.search.searchUser.mockResolvedValue({ results: [mockUser] });
 
-        const result = await confluenceUtil.getUser('cloud', undefined, 'testuser', 'json');
+        const result = await confluenceUtil.getUser(undefined, 'testuser', 'json');
 
         expect(mockClient.search.searchUser).toHaveBeenCalledWith({
           cql: 'user.fullname~"testuser"',
@@ -614,7 +590,7 @@ describe('confluence-utils', () => {
       it('should return error if user not found by username', async () => {
         mockClient.search.searchUser.mockResolvedValue({ results: [] });
 
-        const result = await confluenceUtil.getUser('cloud', undefined, 'nonexistent');
+        const result = await confluenceUtil.getUser(undefined, 'nonexistent');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: User "nonexistent" not found');
@@ -624,7 +600,7 @@ describe('confluence-utils', () => {
         const mockUser = { displayName: 'Current User', email: 'current@test.com' };
         mockClient.users.getCurrentUser.mockResolvedValue(mockUser);
 
-        const result = await confluenceUtil.getUser('cloud', undefined, undefined, 'json');
+        const result = await confluenceUtil.getUser(undefined, undefined, 'json');
 
         expect(mockClient.users.getCurrentUser).toHaveBeenCalled();
         expect(result.success).toBe(true);
@@ -634,7 +610,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.users.getUser.mockRejectedValue(new Error('User not found'));
 
-        const result = await confluenceUtil.getUser('cloud', '999');
+        const result = await confluenceUtil.getUser('999');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: User not found');
@@ -646,7 +622,7 @@ describe('confluence-utils', () => {
         const mockUser = { displayName: 'Test User', email: 'test@test.com' };
         mockClient.users.getCurrentUser.mockResolvedValue(mockUser);
 
-        const result = await confluenceUtil.testConnection('cloud');
+        const result = await confluenceUtil.testConnection();
 
         expect(mockClient.users.getCurrentUser).toHaveBeenCalled();
         expect(result.success).toBe(true);
@@ -659,7 +635,7 @@ describe('confluence-utils', () => {
       it('should return error on connection failure', async () => {
         mockClient.users.getCurrentUser.mockRejectedValue(new Error('Auth failed'));
 
-        const result = await confluenceUtil.testConnection('cloud');
+        const result = await confluenceUtil.testConnection();
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Auth failed');
@@ -667,27 +643,21 @@ describe('confluence-utils', () => {
     });
 
     describe('clearClients', () => {
-      it('should clear all clients from pool', () => {
-        getConfluenceClientOptions
-          .mockReturnValueOnce({
-            host: 'https://test.atlassian.net',
-            authentication: { basic: { email: 'test@test.com', apiToken: 'token' } },
-          })
-          .mockReturnValueOnce({
-            host: 'https://staging.atlassian.net',
-            authentication: { basic: { email: 'staging@test.com', apiToken: 'staging-token' } },
-          });
+      it('should clear client', () => {
+        vi.mocked(configLoaderModule.getConfluenceClientOptions).mockReturnValue({
+          host: 'https://test.atlassian.net',
+          authentication: { basic: { email: 'test@test.com', apiToken: 'token' } },
+        });
 
-        confluenceUtil.getClient('cloud');
-        confluenceUtil.getClient('staging');
+        confluenceUtil.getClient();
 
         // @ts-expect-error - accessing private property for testing
-        expect(confluenceUtil.clientPool.size).toBe(2);
+        expect(confluenceUtil.client).not.toBeNull();
 
         confluenceUtil.clearClients();
 
         // @ts-expect-error - accessing private property for testing
-        expect(confluenceUtil.clientPool.size).toBe(0);
+        expect(confluenceUtil.client).toBeNull();
       });
     });
 
@@ -704,7 +674,7 @@ describe('confluence-utils', () => {
         mockClient.content.getContentById.mockResolvedValue(mockAttachment);
         mockClient.contentAttachments.downloadAttachment.mockResolvedValue(mockBuffer);
 
-        const result = await confluenceUtil.downloadAttachment('cloud', 'att123', '/tmp/document.pdf');
+        const result = await confluenceUtil.downloadAttachment('att123', '/tmp/document.pdf');
 
         expect(mockClient.content.getContentById).toHaveBeenCalledWith({
           id: 'att123',
@@ -738,11 +708,11 @@ describe('confluence-utils', () => {
         mockClient.content.getContentById.mockResolvedValue(mockAttachment);
         mockClient.contentAttachments.downloadAttachment.mockResolvedValue(mockBuffer);
 
-        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+        const result = await confluenceUtil.downloadAttachment('att123');
 
         expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/download$/), mockBuffer);
         expect(result.success).toBe(true);
-        expect(result.data?.fileName).toBe('download');
+        expect((result.data as { fileName: string })?.fileName).toBe('download');
       });
 
       it('should use default media type if not provided', async () => {
@@ -755,11 +725,11 @@ describe('confluence-utils', () => {
         mockClient.content.getContentById.mockResolvedValue(mockAttachment);
         mockClient.contentAttachments.downloadAttachment.mockResolvedValue(mockBuffer);
 
-        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+        const result = await confluenceUtil.downloadAttachment('att123');
 
         expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringMatching(/file\.txt$/), mockBuffer);
         expect(result.success).toBe(true);
-        expect(result.data?.mediaType).toBe('application/octet-stream');
+        expect((result.data as { mediaType: string })?.mediaType).toBe('application/octet-stream');
       });
 
       it('should return error if container not found', async () => {
@@ -771,7 +741,7 @@ describe('confluence-utils', () => {
         };
         mockClient.content.getContentById.mockResolvedValue(mockAttachment);
 
-        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+        const result = await confluenceUtil.downloadAttachment('att123');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Parent content ID not found in attachment metadata');
@@ -781,7 +751,7 @@ describe('confluence-utils', () => {
       it('should return error on API failure', async () => {
         mockClient.content.getContentById.mockRejectedValue(new Error('Attachment not found'));
 
-        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+        const result = await confluenceUtil.downloadAttachment('att123');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Attachment not found');
@@ -797,7 +767,7 @@ describe('confluence-utils', () => {
         mockClient.content.getContentById.mockResolvedValue(mockAttachment);
         mockClient.contentAttachments.downloadAttachment.mockRejectedValue(new Error('Download failed'));
 
-        const result = await confluenceUtil.downloadAttachment('cloud', 'att123');
+        const result = await confluenceUtil.downloadAttachment('att123');
 
         expect(result.success).toBe(false);
         expect(result.error).toBe('ERROR: Download failed');

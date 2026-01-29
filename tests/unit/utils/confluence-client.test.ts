@@ -38,8 +38,6 @@ vi.mock('../../../src/utils/confluence-utils.js', () => ({
   }),
 }));
 
-const originalEnv = process.env;
-
 // Helper function to create a mock instance with all methods
 function createMockInstance() {
   return {
@@ -65,7 +63,6 @@ describe('confluence-client', () => {
     vi.clearAllMocks();
     // Reset modules to clear singleton state
     vi.resetModules();
-    process.env = { ...originalEnv };
 
     // Get the mocked modules
     const confluenceUtilsModule = await import('../../../src/utils/confluence-utils.js');
@@ -76,13 +73,11 @@ describe('confluence-client', () => {
 
     // Default loadConfig mock setup
     loadConfig.mockReturnValue({
-      profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-      defaultProfile: 'cloud',
+      host: 'https://test.atlassian.net',
+      email: 'test@test.com',
+      apiToken: 'token',
+      defaultFormat: 'json',
     });
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
   });
 
   describe('listSpaces', () => {
@@ -97,10 +92,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { listSpaces: freshListSpaces } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshListSpaces('cloud', 'json');
+      const result = await freshListSpaces('json');
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.listSpaces).toHaveBeenCalledWith('cloud', 'json');
+      expect(instance.listSpaces).toHaveBeenCalledWith('json');
     });
 
     it('should use default format when not specified', async () => {
@@ -113,9 +108,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { listSpaces: freshListSpaces } = await import('../../../src/utils/confluence-client.js');
 
-      await freshListSpaces('cloud');
+      await freshListSpaces();
 
-      expect(instance.listSpaces).toHaveBeenCalledWith('cloud', 'json');
+      expect(instance.listSpaces).toHaveBeenCalledWith('json');
     });
 
     it('should use toon format when specified', async () => {
@@ -128,10 +123,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { listSpaces: freshListSpaces } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshListSpaces('staging', 'toon');
+      const result = await freshListSpaces('toon');
 
       expect(result).toEqual({ success: true, result: 'toon-output' });
-      expect(instance.listSpaces).toHaveBeenCalledWith('staging', 'toon');
+      expect(instance.listSpaces).toHaveBeenCalledWith('toon');
     });
   });
 
@@ -146,10 +141,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { getSpace: freshGetSpace } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshGetSpace('cloud', 'DOCS', 'json');
+      const result = await freshGetSpace('DOCS', 'json');
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.getSpace).toHaveBeenCalledWith('cloud', 'DOCS', 'json');
+      expect(instance.getSpace).toHaveBeenCalledWith('DOCS', 'json');
     });
 
     it('should use default format when not specified', async () => {
@@ -162,9 +157,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { getSpace: freshGetSpace } = await import('../../../src/utils/confluence-client.js');
 
-      await freshGetSpace('cloud', 'DOCS');
+      await freshGetSpace('DOCS');
 
-      expect(instance.getSpace).toHaveBeenCalledWith('cloud', 'DOCS', 'json');
+      expect(instance.getSpace).toHaveBeenCalledWith('DOCS', 'json');
     });
   });
 
@@ -179,10 +174,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { listPages: freshListPages } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshListPages('cloud', 'DOCS', 'Test', 10, 5, 'json');
+      const result = await freshListPages('DOCS', 'Test', 10, 5, 'json');
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.listPages).toHaveBeenCalledWith('cloud', 'DOCS', 'Test', 10, 5, 'json');
+      expect(instance.listPages).toHaveBeenCalledWith('DOCS', 'Test', 10, 5, 'json');
     });
 
     it('should use default values for limit, start, and format', async () => {
@@ -195,9 +190,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { listPages: freshListPages } = await import('../../../src/utils/confluence-client.js');
 
-      await freshListPages('cloud');
+      await freshListPages();
 
-      expect(instance.listPages).toHaveBeenCalledWith('cloud', undefined, undefined, 25, 0, 'json');
+      expect(instance.listPages).toHaveBeenCalledWith(undefined, undefined, 25, 0, 'json');
     });
 
     it('should pass undefined for optional parameters', async () => {
@@ -210,9 +205,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { listPages: freshListPages } = await import('../../../src/utils/confluence-client.js');
 
-      await freshListPages('cloud', undefined, 'Title Only');
+      await freshListPages(undefined, 'Title Only');
 
-      expect(instance.listPages).toHaveBeenCalledWith('cloud', undefined, 'Title Only', 25, 0, 'json');
+      expect(instance.listPages).toHaveBeenCalledWith(undefined, 'Title Only', 25, 0, 'json');
     });
   });
 
@@ -227,10 +222,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { getPage: freshGetPage } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshGetPage('cloud', '123', 'json');
+      const result = await freshGetPage('123', 'json');
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.getPage).toHaveBeenCalledWith('cloud', '123', 'json');
+      expect(instance.getPage).toHaveBeenCalledWith('123', 'json');
     });
 
     it('should use default format when not specified', async () => {
@@ -243,9 +238,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { getPage: freshGetPage } = await import('../../../src/utils/confluence-client.js');
 
-      await freshGetPage('cloud', '123');
+      await freshGetPage('123');
 
-      expect(instance.getPage).toHaveBeenCalledWith('cloud', '123', 'json');
+      expect(instance.getPage).toHaveBeenCalledWith('123', 'json');
     });
   });
 
@@ -260,10 +255,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { createPage: freshCreatePage } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshCreatePage('cloud', 'DOCS', 'New Page', '<p>Content</p>', '123', 'json');
+      const result = await freshCreatePage('DOCS', 'New Page', '<p>Content</p>', '123', 'json');
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.createPage).toHaveBeenCalledWith('cloud', 'DOCS', 'New Page', '<p>Content</p>', '123', 'json');
+      expect(instance.createPage).toHaveBeenCalledWith('DOCS', 'New Page', '<p>Content</p>', '123', 'json');
     });
 
     it('should use default values for parentId and format', async () => {
@@ -276,16 +271,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { createPage: freshCreatePage } = await import('../../../src/utils/confluence-client.js');
 
-      await freshCreatePage('cloud', 'DOCS', 'New Page', '<p>Content</p>');
+      await freshCreatePage('DOCS', 'New Page', '<p>Content</p>');
 
-      expect(instance.createPage).toHaveBeenCalledWith(
-        'cloud',
-        'DOCS',
-        'New Page',
-        '<p>Content</p>',
-        undefined,
-        'json'
-      );
+      expect(instance.createPage).toHaveBeenCalledWith('DOCS', 'New Page', '<p>Content</p>', undefined, 'json');
     });
 
     it('should pass undefined for optional parentId', async () => {
@@ -298,16 +286,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { createPage: freshCreatePage } = await import('../../../src/utils/confluence-client.js');
 
-      await freshCreatePage('cloud', 'DOCS', 'New Page', '<p>Content</p>', undefined);
+      await freshCreatePage('DOCS', 'New Page', '<p>Content</p>', undefined);
 
-      expect(instance.createPage).toHaveBeenCalledWith(
-        'cloud',
-        'DOCS',
-        'New Page',
-        '<p>Content</p>',
-        undefined,
-        'json'
-      );
+      expect(instance.createPage).toHaveBeenCalledWith('DOCS', 'New Page', '<p>Content</p>', undefined, 'json');
     });
   });
 
@@ -322,10 +303,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { updatePage: freshUpdatePage } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshUpdatePage('cloud', '123', 'Updated Page', '<p>New Content</p>', 2);
+      const result = await freshUpdatePage('123', 'Updated Page', '<p>New Content</p>', 2);
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.updatePage).toHaveBeenCalledWith('cloud', '123', 'Updated Page', '<p>New Content</p>', 2);
+      expect(instance.updatePage).toHaveBeenCalledWith('123', 'Updated Page', '<p>New Content</p>', 2);
     });
   });
 
@@ -340,10 +321,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { addComment: freshAddComment } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshAddComment('cloud', '123', '<p>Comment</p>', 'json');
+      const result = await freshAddComment('123', '<p>Comment</p>', 'json');
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.addComment).toHaveBeenCalledWith('cloud', '123', '<p>Comment</p>', 'json');
+      expect(instance.addComment).toHaveBeenCalledWith('123', '<p>Comment</p>', 'json');
     });
 
     it('should use default format when not specified', async () => {
@@ -356,9 +337,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { addComment: freshAddComment } = await import('../../../src/utils/confluence-client.js');
 
-      await freshAddComment('cloud', '123', '<p>Comment</p>');
+      await freshAddComment('123', '<p>Comment</p>');
 
-      expect(instance.addComment).toHaveBeenCalledWith('cloud', '123', '<p>Comment</p>', 'json');
+      expect(instance.addComment).toHaveBeenCalledWith('123', '<p>Comment</p>', 'json');
     });
   });
 
@@ -373,10 +354,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { deletePage: freshDeletePage } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshDeletePage('cloud', '123');
+      const result = await freshDeletePage('123');
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.deletePage).toHaveBeenCalledWith('cloud', '123');
+      expect(instance.deletePage).toHaveBeenCalledWith('123');
     });
   });
 
@@ -391,10 +372,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { getUser: freshGetUser } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshGetUser('cloud', '123', 'testuser', 'json');
+      const result = await freshGetUser('123', 'testuser', 'json');
 
       expect(result).toEqual({ success: true, result: '{}' });
-      expect(instance.getUser).toHaveBeenCalledWith('cloud', '123', 'testuser', 'json');
+      expect(instance.getUser).toHaveBeenCalledWith('123', 'testuser', 'json');
     });
 
     it('should use default values for optional parameters', async () => {
@@ -407,9 +388,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { getUser: freshGetUser } = await import('../../../src/utils/confluence-client.js');
 
-      await freshGetUser('cloud');
+      await freshGetUser();
 
-      expect(instance.getUser).toHaveBeenCalledWith('cloud', undefined, undefined, 'json');
+      expect(instance.getUser).toHaveBeenCalledWith(undefined, undefined, 'json');
     });
 
     it('should pass undefined for accountId and username when not provided', async () => {
@@ -422,9 +403,9 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { getUser: freshGetUser } = await import('../../../src/utils/confluence-client.js');
 
-      await freshGetUser('cloud', undefined, undefined);
+      await freshGetUser(undefined, undefined);
 
-      expect(instance.getUser).toHaveBeenCalledWith('cloud', undefined, undefined, 'json');
+      expect(instance.getUser).toHaveBeenCalledWith(undefined, undefined, 'json');
     });
 
     it('should use toon format when specified', async () => {
@@ -437,14 +418,14 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { getUser: freshGetUser } = await import('../../../src/utils/confluence-client.js');
 
-      await freshGetUser('cloud', '123', undefined, 'toon');
+      await freshGetUser('123', undefined, 'toon');
 
-      expect(instance.getUser).toHaveBeenCalledWith('cloud', '123', undefined, 'toon');
+      expect(instance.getUser).toHaveBeenCalledWith('123', undefined, 'toon');
     });
   });
 
   describe('testConnection', () => {
-    it('should call ConfluenceUtil.testConnection with correct profile', async () => {
+    it('should call ConfluenceUtil.testConnection', async () => {
       const instance = createMockInstance();
       instance.testConnection.mockResolvedValue({ success: true, result: 'Connected' });
       ConfluenceUtil.mockImplementation(function (this: MockConfluenceUtil) {
@@ -454,10 +435,10 @@ describe('confluence-client', () => {
       vi.resetModules();
       const { testConnection: freshTestConnection } = await import('../../../src/utils/confluence-client.js');
 
-      const result = await freshTestConnection('cloud');
+      const result = await freshTestConnection();
 
       expect(result).toEqual({ success: true, result: 'Connected' });
-      expect(instance.testConnection).toHaveBeenCalledWith('cloud');
+      expect(instance.testConnection).toHaveBeenCalledWith();
     });
   });
 
@@ -474,7 +455,7 @@ describe('confluence-client', () => {
         await import('../../../src/utils/confluence-client.js');
 
       // First initialize to create instance
-      await freshListSpaces('cloud');
+      await freshListSpaces();
 
       freshClearClients();
 
@@ -493,7 +474,7 @@ describe('confluence-client', () => {
         await import('../../../src/utils/confluence-client.js');
 
       // Initialize
-      await freshListSpaces('cloud');
+      await freshListSpaces();
 
       // Clear
       freshClearClients();
@@ -514,13 +495,15 @@ describe('confluence-client', () => {
       const configLoaderModule = await import('../../../src/utils/config-loader.js');
       const freshLoadConfig = vi.mocked(configLoaderModule.loadConfig);
       freshLoadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
+        defaultFormat: 'json',
       });
 
       const { listSpaces: freshListSpaces } = await import('../../../src/utils/confluence-client.js');
 
-      await freshListSpaces('cloud');
+      await freshListSpaces();
 
       expect(freshLoadConfig).toHaveBeenCalled();
       expect(ConfluenceUtil).toHaveBeenCalled();
@@ -538,15 +521,17 @@ describe('confluence-client', () => {
       const configLoaderModule = await import('../../../src/utils/config-loader.js');
       const freshLoadConfig = vi.mocked(configLoaderModule.loadConfig);
       freshLoadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
+        host: 'https://test.atlassian.net',
+        email: 'test@test.com',
+        apiToken: 'token',
+        defaultFormat: 'json',
       });
 
       const { listSpaces: freshListSpaces, getSpace: freshGetSpace } =
         await import('../../../src/utils/confluence-client.js');
 
-      await freshListSpaces('cloud');
-      await freshGetSpace('cloud', 'DOCS');
+      await freshListSpaces();
+      await freshGetSpace('DOCS');
 
       expect(ConfluenceUtil).toHaveBeenCalledTimes(1);
       expect(freshLoadConfig).toHaveBeenCalledTimes(1);
@@ -562,59 +547,7 @@ describe('confluence-client', () => {
 
       const { listSpaces: freshListSpaces } = await import('../../../src/utils/confluence-client.js');
 
-      await expect(freshListSpaces('cloud')).rejects.toThrow(
-        'Failed to initialize Confluence client: Config load failed'
-      );
-    });
-  });
-
-  describe('environment variables', () => {
-    it('should use CLAUDE_PROJECT_ROOT if set', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = '/custom/root';
-
-      const instance = createMockInstance();
-      instance.listSpaces.mockResolvedValue({ success: true, result: '{}' });
-      ConfluenceUtil.mockImplementation(function (this: MockConfluenceUtil) {
-        Object.assign(this, instance);
-      });
-
-      vi.resetModules();
-      const configLoaderModule = await import('../../../src/utils/config-loader.js');
-      const freshLoadConfig = vi.mocked(configLoaderModule.loadConfig);
-      freshLoadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
-      });
-
-      const { listSpaces: freshListSpaces } = await import('../../../src/utils/confluence-client.js');
-
-      await freshListSpaces('cloud');
-
-      expect(freshLoadConfig).toHaveBeenCalledWith('/custom/root');
-    });
-
-    it('should use process.cwd() if CLAUDE_PROJECT_ROOT not set', async () => {
-      delete process.env.CLAUDE_PROJECT_ROOT;
-
-      const instance = createMockInstance();
-      instance.listSpaces.mockResolvedValue({ success: true, result: '{}' });
-      ConfluenceUtil.mockImplementation(function (this: MockConfluenceUtil) {
-        Object.assign(this, instance);
-      });
-
-      vi.resetModules();
-      const configLoaderModule = await import('../../../src/utils/config-loader.js');
-      const freshLoadConfig = vi.mocked(configLoaderModule.loadConfig);
-      freshLoadConfig.mockReturnValue({
-        profiles: { cloud: { host: 'https://test.atlassian.net', email: 'test@test.com', apiToken: 'token' } },
-        defaultProfile: 'cloud',
-      });
-
-      const { listSpaces: freshListSpaces } = await import('../../../src/utils/confluence-client.js');
-
-      await freshListSpaces('cloud');
-
-      expect(freshLoadConfig).toHaveBeenCalledWith(process.cwd());
+      await expect(freshListSpaces()).rejects.toThrow('Failed to initialize Confluence client: Config load failed');
     });
   });
 });

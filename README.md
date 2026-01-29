@@ -8,7 +8,6 @@ A powerful command-line interface for Confluence interaction with support for pa
 
 - 💻 **Interactive REPL** for Confluence exploration and management
 - 🚀 **Headless mode** for one-off command execution and automation
-- 🔐 **Multi-profile support** for managing different Confluence instances
 - 📊 **Multiple output formats**: JSON or TOON
 - 📄 **Page management**: create, read, update, delete pages
 - 💬 **Comment support**: add comments to pages with markdown support
@@ -32,72 +31,68 @@ npm install -g conni-cli
 
 ## Configuration
 
-### Step 1: Create API Token
+### Interactive Setup
+
+The easiest way to configure the CLI is using the interactive setup command:
+
+```bash
+conni-cli config
+```
+
+This will prompt you for:
+
+1. **Host URL** - Your Confluence instance URL (e.g., `https://your-domain.atlassian.net/wiki`)
+2. **Email** - Your Atlassian account email
+3. **API Token** - Your Confluence API token (input is hidden)
+4. **Output Format** - Default format for results (json or toon)
+
+### Manual Configuration
+
+Configuration is stored in `~/.connicli` using INI format:
+
+```ini
+[auth]
+host=https://your-domain.atlassian.net/wiki
+email=your-email@example.com
+api_token=YOUR_API_TOKEN_HERE
+
+[defaults]
+format=json
+```
+
+### Creating an API Token
 
 1. Go to [Atlassian API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 2. Click "Create API token"
 3. Give it a label (e.g., "Confluence CLI")
 4. Copy the generated token
 
-### Step 2: Create Configuration File
-
-Create a configuration file at `.claude/atlassian-config.local.md` in your project root:
-
-```markdown
----
-profiles:
-  cloud:
-    host: https://your-domain.atlassian.net/wiki
-    email: your-email@example.com
-    apiToken: YOUR_API_TOKEN_HERE
-
-defaultProfile: cloud
-defaultFormat: json
----
-
-# Confluence API Configuration
-
-This file stores your Confluence API connection profiles.
-```
-
 ### Configuration Options
 
-- **profiles**: Named Confluence connection profiles
+- **[auth] section**:
   - `host`: Your Confluence Cloud instance URL (must start with https:// and include /wiki)
   - `email`: Your Atlassian account email
-  - `apiToken`: Your Confluence API token
+  - `api_token`: Your Confluence API token
 
-- **defaultProfile**: Profile name to use when none specified
-- **defaultFormat**: Default output format (`json` or `toon`)
-
-### Multiple Profiles Example
-
-```yaml
----
-profiles:
-  production:
-    host: https://company.atlassian.net/wiki
-    email: user@company.com
-    apiToken: prod_token_here
-
-  staging:
-    host: https://company-staging.atlassian.net/wiki
-    email: user@company.com
-    apiToken: staging_token_here
-
-defaultProfile: production
-defaultFormat: json
----
-```
+- **[defaults] section**:
+  - `format`: Default output format (`json` or `toon`)
 
 ## Quick Start
 
-### Interactive Mode
+### Step 1: Configure the CLI
+
+```bash
+conni-cli config
+```
+
+Follow the prompts to enter your Confluence credentials.
+
+### Step 2: Start the CLI
 
 Start the CLI and interact with Confluence through a REPL:
 
 ```bash
-npx conni-cli
+conni-cli
 ```
 
 Once started, you'll see the `conni>` prompt:
@@ -114,28 +109,28 @@ Execute single commands directly:
 
 ```bash
 # Test connection
-npx conni-cli test-connection
+conni-cli test-connection
 
 # List all spaces
-npx conni-cli list-spaces
+conni-cli list-spaces
 
 # Get space details
-npx conni-cli get-space '{"spaceKey":"DOCS"}'
+conni-cli get-space '{"spaceKey":"DOCS"}'
 
 # List pages in a space
-npx conni-cli list-pages '{"spaceKey":"DOCS","limit":10}'
+conni-cli list-pages '{"spaceKey":"DOCS","limit":10}'
 
 # Get page details
-npx conni-cli get-page '{"pageId":"123456"}'
+conni-cli get-page '{"pageId":"123456"}'
 
 # Create a new page
-npx conni-cli create-page '{"spaceKey":"DOCS","title":"New Page","body":"<p>Hello World</p>"}'
+conni-cli create-page '{"spaceKey":"DOCS","title":"New Page","body":"<p>Hello World</p>"}'
 
 # Add comment to a page
-npx conni-cli add-comment '{"pageId":"123456","body":"<p>Great article!</p>"}'
+conni-cli add-comment '{"pageId":"123456","body":"<p>Great article!</p>"}'
 
 # Download an attachment
-npx conni-cli download-attachment '{"attachmentId":"att12345","outputPath":"./document.pdf"}'
+conni-cli download-attachment '{"attachmentId":"att12345","outputPath":"./document.pdf"}'
 ```
 
 ## Available Commands
@@ -227,8 +222,6 @@ Special commands available in the REPL:
 
 - **commands** - List all available commands
 - **help** or **?** - Show help message
-- **profile \<name\>** - Switch to a different profile
-- **profiles** - List all available profiles
 - **format \<type\>** - Set output format (json, toon)
 - **clear** - Clear the screen
 - **exit**, **quit**, or **q** - Exit the CLI
@@ -257,11 +250,11 @@ conni> list-pages
 
 ⚠️ **Important Security Notes:**
 
-1. **Never commit** `.claude/atlassian-config.local.md` to version control
-2. Add `*.local.md` to your `.gitignore`
-3. Keep your API tokens secure and rotate them periodically
-4. Use different API tokens for different environments
-5. API tokens have the same permissions as your user account
+1. Configuration file `~/.connicli` is stored with secure permissions (0600 - owner read/write only)
+2. Keep your API tokens secure and rotate them periodically
+3. Never share your configuration file with others
+4. API tokens have the same permissions as your user account
+5. Use environment-specific API tokens for different environments
 
 ## Development
 
@@ -298,70 +291,13 @@ npm run find-deadcode       # Find unused exports
 npm run pre-commit          # Run format + find-deadcode
 ```
 
-## Examples
-
-### Basic Workflow
-
-```bash
-# Start interactive mode
-npx conni-cli
-
-# List all spaces
-conni> list-spaces
-
-# Get specific space
-conni> get-space {"spaceKey":"DOCS"}
-
-# List pages in a space
-conni> list-pages {"spaceKey":"DOCS","limit":10}
-
-# Get specific page
-conni> get-page {"pageId":"123456"}
-
-# Create new page
-conni> create-page {"spaceKey":"DOCS","title":"New Page","body":"<p>Hello World</p>"}
-
-# Update page
-conni> update-page {"pageId":"123456","title":"Updated Title","body":"<p>Updated content</p>","version":1}
-
-# Add comment to page
-conni> add-comment {"pageId":"123456","body":"<p>Great article!</p>"}
-
-# Download attachment
-conni> download-attachment {"attachmentId":"att12345","outputPath":"./document.pdf"}
-```
-
-### Automation Scripts
-
-```bash
-#!/bin/bash
-# Get all pages in a space
-npx conni-cli list-pages '{"spaceKey":"DOCS","limit":100}' > pages.json
-
-# Test connection
-npx conni-cli test-connection
-
-# Create page from script
-npx conni-cli create-page '{
-  "spaceKey": "DOCS",
-  "title": "Automated Page Creation",
-  "body": "<p>Created via automation script</p>"
-}'
-
-# Add comment to page
-npx conni-cli add-comment '{
-  "pageId": "123456",
-  "body": "<p><strong>Automation Update</strong><br/>Build completed successfully at $(date)</p>"
-}'
-```
-
 ## Troubleshooting
 
 ### Connection Issues
 
 ```bash
 # Test your connection
-npx conni-cli test-connection
+conni-cli test-connection
 
 # Common issues:
 # 1. Invalid API token - regenerate token

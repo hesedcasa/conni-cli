@@ -23,6 +23,9 @@ npm run test:watch          # Run tests in watch mode
 npm run test:ui             # Run tests with UI
 npm run test:coverage       # Run tests with coverage report
 
+# Run a single test file
+npm test -- <test-file>     # e.g., npm test -- config-loader.test.ts
+
 # Code quality
 npm run format              # Format code with ESLint and Prettier
 npm run find-deadcode       # Find unused exports with ts-prune
@@ -50,35 +53,45 @@ src/
 │   └── constants.ts                       # Command definitions
 └── utils/
     ├── index.ts                           # Barrel export
-    ├── arg-parser.ts                       # Command-line argument parser
-    ├── config-loader.ts                   # YAML config file loader
+    ├── arg-parser.ts                      # Command-line argument parser
+    ├── config-loader.ts                   # INI config file loader & setup
     ├── confluence-client.ts               # Confluence API wrapper functions
     └── confluence-utils.ts                # Core Confluence utility class
 
 tests/
 ├── unit/
+│   ├── cli/
+│   │   └── wrapper.test.ts                # CLI class tests
+│   ├── commands/
+│   │   ├── helpers.test.ts                # Command helper tests
+│   │   └── runner.test.ts                 # Command runner tests
 │   └── utils/
-│       └── config-loader.test.ts          # Tests for config loading
+│       ├── arg-parser.test.ts             # Argument parser tests
+│       ├── config-loader.test.ts          # Config loading tests
+│       ├── confluence-client.test.ts      # Confluence client wrapper tests
+│       └── confluence-utils.test.ts       # Core utility tests
 └── integration/
-    └── (integration tests)
+    └── cli-integration.test.ts            # End-to-end CLI tests
 ```
 
 ### Core Components
 
 #### Entry Point (`src/index.ts`)
 
-- Bootstraps the application
-- Parses command-line arguments via `parseArguments()`
-- Routes to interactive REPL or headless mode
+- Minimal bootstrapper that routes to interactive REPL or headless mode
+- Delegates argument parsing to `parseArguments()` from `utils/arg-parser.ts`
+- Handles top-level error catching
 
-#### CLI Module (`src/cli/`)
+#### CLI Module (`src/cli/wrapper.ts`)
 
 - **wrapper class**: Main orchestrator managing:
-  - `connect()` - Loads configuration from `.claude/atlassian-config.local.md`
+  - `connect()` - Loads configuration from `~/.connicli`
   - `start()` - Initiates interactive REPL with readline interface
   - `handleCommand()` - Parses and processes user commands
   - `runCommand()` - Executes Confluence commands with result formatting
   - `disconnect()` - Graceful cleanup on exit signals (SIGINT/SIGTERM)
+
+**Special REPL commands**: `help`, `commands`, `format <type>`, `clear`, `exit/quit/q`
 
 #### Commands Module (`src/commands/`)
 
@@ -89,21 +102,23 @@ tests/
 - `runner.ts` - Execute commands in headless mode
   - `runCommand(command, arg, flag)` - Non-interactive command execution
 
-#### Config Module (`src/config/`)
+#### Config Module (`src/config/constants.ts`)
 
-- `constants.ts` - Centralized configuration
-  - `COMMANDS[]` - Array of 11 available Confluence command names
-  - `COMMANDS_INFO[]` - Brief descriptions for each command
-  - `COMMANDS_DETAIL[]` - Detailed parameter documentation
+- `COMMANDS[]` - Array of 11 available Confluence command names
+- `COMMANDS_INFO[]` - Brief descriptions for each command
+- `COMMANDS_DETAIL[]` - Detailed parameter documentation
 
 #### Utils Module (`src/utils/`)
 
 - `arg-parser.ts` - Command-line argument handling
-  - `parseArguments(args)` - Parses CLI flags and routes execution
+  - `parseArguments(args)` - Parses CLI flags, config setup, and routes execution
+  - Handles `conni-cli config` command for interactive setup
 - `config-loader.ts` - Configuration file management
-  - `loadConfig(projectRoot)` - Loads `.claude/atlassian-config.local.md`
-  - `getConfluenceClientOptions(config, profileName)` - Builds confluence.js client options
-  - TypeScript interfaces: `Config`, `ConfluenceProfile`, `ConfluenceClientOptions`
+  - `loadConfig()` - Loads INI config from `~/.connicli`
+  - `setupConfig()` - Interactive config setup with readline prompts
+  - `parseIniConfig(content)` - INI parser with validation
+  - Security: Atomic write with `0o600` permissions
+  - TypeScript interfaces: `Config`, `ConfluenceClientOptions`
 - `confluence-client.ts` - Confluence API wrapper functions
   - Exports: `listSpaces()`, `getSpace()`, `listPages()`, `getPage()`, `createPage()`, `updatePage()`, `addComment()`, `deletePage()`, `downloadAttachment()`, `getUser()`, `testConnection()`, `clearClients()`
   - Manages singleton `ConfluenceUtil` instance
@@ -114,32 +129,37 @@ tests/
 
 ### Configuration System
 
-The CLI loads Confluence profiles from `.claude/atlassian-config.local.md` with YAML frontmatter:
+Configuration is stored in `~/.connicli` using INI format:
 
-```yaml
----
-profiles:
-  cloud:
-    host: https://your-domain.atlassian.net/wiki
-    email: your-email@example.com
-    apiToken: YOUR_API_TOKEN_HERE
+```ini
+[auth]
+host=https://your-domain.atlassian.net/wiki
+email=your-email@example.com
+api_token=YOUR_API_TOKEN_HERE
 
-defaultProfile: cloud
-defaultFormat: json
----
+[defaults]
+format=json
 ```
 
 **Key behaviors:**
 
-- Profiles are referenced by name in commands
-- Multiple profiles support different Confluence instances (cloud, staging, etc.)
 - Configuration is validated on load with clear error messages
 - API tokens are used for authentication (basic auth)
+- File permissions: `0o600` (owner read/write only) for security
+- Interactive setup via `conni-cli config` command
+- Existing values pre-populated during reconfiguration
+
+**Setup workflow:**
+
+1. User runs `conni-cli config`
+2. Prompts for: host (URL validation), email (email validation), api_token (hidden input), format (json/toon)
+3. Validates all inputs before writing
+4. Atomic write with secure permissions
 
 ### REPL Interface
 
 - Custom prompt: `conni>`
-- **Special commands**: `help`, `commands`, `profiles`, `profile <name>`, `format <type>`, `clear`, `exit/quit/q`
+- **Special commands**: `help`, `commands`, `format <type>`, `clear`, `exit/quit/q`
 - **Confluence commands**: 11 commands accepting JSON arguments
   1. `list-spaces` - List all accessible spaces
   2. `get-space` - Get details of a specific space
@@ -179,14 +199,15 @@ The CLI provides **11 Confluence commands**:
 ### Command Examples
 
 ```bash
+# Setup configuration (interactive)
+conni-cli config
+
 # Start the CLI in interactive mode
 npm start
 
 # Inside the REPL:
 conni> commands                          # List all 11 commands
 conni> help                              # Show help
-conni> profiles                          # List available profiles
-conni> profile production                # Switch profile
 conni> format json                       # Change output format
 conni> list-spaces
 conni> get-space '{"spaceKey":"DOCS"}'
@@ -198,13 +219,13 @@ conni> download-attachment '{"attachmentId":"att12345","outputPath":"./document.
 conni> exit                              # Exit
 
 # Headless mode (one-off commands):
-npx conni-cli test-connection '{"profile":"cloud"}'
-npx conni-cli list-spaces
-npx conni-cli get-page '{"pageId":"123456","format":"json"}'
-npx conni-cli --commands        # List all commands
-npx conni-cli list-pages -h     # Command-specific help
-npx conni-cli --help            # General help
-npx conni-cli --version         # Show version
+conni-cli test-connection
+conni-cli list-spaces
+conni-cli get-page '{"pageId":"123456","format":"json"}'
+conni-cli --commands        # List all commands
+conni-cli list-pages -h     # Command-specific help
+conni-cli --help            # General help
+conni-cli --version         # Show version
 ```
 
 ## Code Structure & Module Responsibilities
@@ -218,7 +239,7 @@ npx conni-cli --version         # Show version
 ### CLI Class (`cli/wrapper.ts`)
 
 - Interactive REPL management
-- Configuration loading and profile switching
+- Configuration loading
 - User command processing
 - Confluence command execution with result formatting
 - Graceful shutdown handling
@@ -243,11 +264,12 @@ npx conni-cli --version         # Show version
 
 ### Config Loader (`utils/config-loader.ts`)
 
-- Reads and parses `.claude/atlassian-config.local.md`
-- Extracts YAML frontmatter with Confluence profiles
-- Validates required fields for each profile
-- Provides default values for settings
+- Reads and parses `~/.connicli` INI file
+- Interactive setup with validation
+- Validates required fields (host, email, api_token)
+- Provides default values for settings (format defaults to json)
 - Builds confluence.js client options
+- Security: Atomic write with `0o600` permissions
 
 ### Confluence Client (`utils/confluence-client.ts`)
 
@@ -258,14 +280,15 @@ npx conni-cli --version         # Show version
 ### Confluence Utils (`utils/confluence-utils.ts`)
 
 - Core Confluence interaction logic
-- Client pooling per profile
+- Client pooling per configuration
 - API call execution
 - Result formatting (JSON, TOON)
-- All 10 command implementations
+- All 11 command implementations
 
 ### Argument Parser (`utils/arg-parser.ts`)
 
 - CLI flag parsing (--help, --version, --commands, etc.)
+- Handles `conni-cli config` command
 - Routing logic for different execution modes
 - Command detection and validation
 
@@ -274,17 +297,16 @@ npx conni-cli --version         # Show version
 - **Barrel Exports**: Each module directory has `index.ts` exporting public APIs
 - **ES Modules**: All imports use `.js` extensions (TypeScript requirement)
 - **Argument Parsing**: Supports JSON arguments for command parameters
-- **Client Pooling**: Reuses Confluence clients per profile for efficiency
+- **Client Pooling**: Reuses Confluence client for efficiency
 - **Signal Handling**: Graceful shutdown on Ctrl+C (SIGINT) and SIGTERM
 - **Error Handling**: Try-catch blocks with user-friendly error messages
-- **Configuration**: YAML frontmatter in `.claude/atlassian-config.local.md`
+- **Configuration**: INI format in `~/.connicli` with `0o600` permissions
 
 ## Dependencies
 
 **Runtime**:
 
 - `confluence.js@^2.1.0` - Confluence API client for Node.js
-- `yaml@^2.8.1` - YAML parser for config files
 - `@toon-format/toon@^2.0.0` - TOON format encoder
 
 **Development**:
@@ -293,7 +315,7 @@ npx conni-cli --version         # Show version
 - `tsx@^4.0.0` - TypeScript execution runtime
 - `vitest@^4.0.9` - Test framework
 - `eslint@^9.39.1` - Linting
-- `prettier@3.6.2` - Code formatting
+- `prettier@3.8.0` - Code formatting
 - `ts-prune@^0.10.3` - Find unused exports
 
 ## Testing
@@ -303,6 +325,7 @@ This project uses **Vitest** for testing with the following configuration:
 - **Test Framework**: Vitest with globals enabled
 - **Test Files**: `tests/**/*.test.ts`
 - **Coverage**: V8 coverage provider with text, JSON, and HTML reports
+- **Coverage Exclusions**: Barrel exports (`**/index.ts`), test files, config files, and dist
 
 ### Running Tests
 
@@ -318,28 +341,20 @@ npm run test:ui
 
 # Generate coverage report
 npm run test:coverage
-```
 
-### Test Structure
-
-```
-tests/
-├── unit/
-│   └── utils/
-│       └── config-loader.test.ts      # Config loading and validation
-└── integration/
-    └── (integration tests)
+# Run a single test file
+npm test -- <test-file>
 ```
 
 ## Important Notes
 
-1. **Configuration Required**: CLI requires `.claude/atlassian-config.local.md` with valid Confluence profiles
+1. **Configuration Required**: CLI requires `~/.connicli` with valid Confluence credentials (run `conni-cli config`)
 2. **ES2022 Modules**: Project uses `"type": "module"` - no CommonJS
 3. **API Authentication**: Uses Confluence API tokens with basic authentication
-4. **Multi-Profile**: Supports multiple Confluence instances (cloud, staging, etc.)
 5. **Flexible Output**: JSON or TOON formats for different use cases
-6. **Client Pooling**: Reuses clients per profile for better performance
+6. **Client Pooling**: Reuses Confluence client for better performance
 7. **Storage Format**: Page content uses Confluence storage format (XHTML-based)
+8. **Security**: Config file written with `0o600` permissions (owner read/write only)
 
 ## Commit Message Convention
 

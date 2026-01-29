@@ -5,8 +5,6 @@ import { loadConfig } from './config-loader.js';
 import type { ApiResult } from './confluence-utils.js';
 import { ConfluenceUtil } from './confluence-utils.js';
 
-const projectRoot = process.env.CLAUDE_PROJECT_ROOT || process.cwd();
-
 let confluenceUtil: ConfluenceUtil | null = null;
 
 /**
@@ -16,7 +14,7 @@ async function initConfluence(): Promise<ConfluenceUtil> {
   if (confluenceUtil) return confluenceUtil;
 
   try {
-    const config = loadConfig(projectRoot);
+    const config = loadConfig();
     confluenceUtil = new ConfluenceUtil(config);
     return confluenceUtil;
   } catch (error: unknown) {
@@ -27,32 +25,25 @@ async function initConfluence(): Promise<ConfluenceUtil> {
 
 /**
  * List all spaces
- * @param profile - Confluence profile name
  * @param format - Output format (json, toon)
  */
-export async function listSpaces(profile: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
+export async function listSpaces(format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.listSpaces(profile, format);
+  return await confluence.listSpaces(format);
 }
 
 /**
  * Get space details
- * @param profile - Confluence profile name
  * @param spaceKey - Space key
  * @param format - Output format (json, toon)
  */
-export async function getSpace(
-  profile: string,
-  spaceKey: string,
-  format: 'json' | 'toon' = 'json'
-): Promise<ApiResult> {
+export async function getSpace(spaceKey: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.getSpace(profile, spaceKey, format);
+  return await confluence.getSpace(spaceKey, format);
 }
 
 /**
  * List pages in a space or by search criteria
- * @param profile - Confluence profile name
  * @param spaceKey - Space key (optional)
  * @param title - Title search string (optional)
  * @param limit - Maximum number of results
@@ -60,7 +51,6 @@ export async function getSpace(
  * @param format - Output format (json, toon)
  */
 export async function listPages(
-  profile: string,
   spaceKey?: string,
   title?: string,
   limit = 25,
@@ -68,23 +58,21 @@ export async function listPages(
   format: 'json' | 'toon' = 'json'
 ): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.listPages(profile, spaceKey, title, limit, start, format);
+  return await confluence.listPages(spaceKey, title, limit, start, format);
 }
 
 /**
  * Get page details
- * @param profile - Confluence profile name
  * @param pageId - Page ID
  * @param format - Output format (json, toon)
  */
-export async function getPage(profile: string, pageId: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
+export async function getPage(pageId: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.getPage(profile, pageId, format);
+  return await confluence.getPage(pageId, format);
 }
 
 /**
  * Create a new page
- * @param profile - Confluence profile name
  * @param spaceKey - Space key where the page will be created
  * @param title - Page title
  * @param body - Page body content (storage format)
@@ -92,7 +80,6 @@ export async function getPage(profile: string, pageId: string, format: 'json' | 
  * @param format - Output format (json, toon)
  */
 export async function createPage(
-  profile: string,
   spaceKey: string,
   title: string,
   body: string,
@@ -100,94 +87,72 @@ export async function createPage(
   format: 'json' | 'toon' = 'json'
 ): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.createPage(profile, spaceKey, title, body, parentId, format);
+  return await confluence.createPage(spaceKey, title, body, parentId, format);
 }
 
 /**
  * Update an existing page
- * @param profile - Confluence profile name
  * @param pageId - Page ID to update
  * @param title - New page title
  * @param body - New page body content (storage format)
  * @param version - Current page version number
  */
-export async function updatePage(
-  profile: string,
-  pageId: string,
-  title: string,
-  body: string,
-  version: number
-): Promise<ApiResult> {
+export async function updatePage(pageId: string, title: string, body: string, version: number): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.updatePage(profile, pageId, title, body, version);
+  return await confluence.updatePage(pageId, title, body, version);
 }
 
 /**
  * Add a comment to a page
- * @param profile - Confluence profile name
  * @param pageId - Page ID to add comment to
  * @param body - Comment body content (storage format)
  * @param format - Output format (json, toon)
  */
-export async function addComment(
-  profile: string,
-  pageId: string,
-  body: string,
-  format: 'json' | 'toon' = 'json'
-): Promise<ApiResult> {
+export async function addComment(pageId: string, body: string, format: 'json' | 'toon' = 'json'): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.addComment(profile, pageId, body, format);
+  return await confluence.addComment(pageId, body, format);
 }
 
 /**
  * Delete a page
- * @param profile - Confluence profile name
  * @param pageId - Page ID to delete
  */
-export async function deletePage(profile: string, pageId: string): Promise<ApiResult> {
+export async function deletePage(pageId: string): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.deletePage(profile, pageId);
+  return await confluence.deletePage(pageId);
 }
 
 /**
  * Download an attachment from a page
- * @param profile - Confluence profile name
  * @param attachmentId - Attachment ID to download
  * @param outputPath - Path to save the file (optional)
  */
-export async function downloadAttachment(
-  profile: string,
-  attachmentId: string,
-  outputPath?: string
-): Promise<ApiResult> {
+export async function downloadAttachment(attachmentId: string, outputPath?: string): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.downloadAttachment(profile, attachmentId, outputPath);
+  return await confluence.downloadAttachment(attachmentId, outputPath);
 }
 
 /**
  * Get user information
- * @param profile - Confluence profile name
  * @param accountId - User account ID
  * @param username - Username
  * @param format - Output format (json, toon)
  */
 export async function getUser(
-  profile: string,
   accountId?: string,
   username?: string,
   format: 'json' | 'toon' = 'json'
 ): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.getUser(profile, accountId, username, format);
+  return await confluence.getUser(accountId, username, format);
 }
 
 /**
  * Test Confluence API connection
- * @param profile - Confluence profile name
  */
-export async function testConnection(profile: string): Promise<ApiResult> {
+export async function testConnection(): Promise<ApiResult> {
   const confluence = await initConfluence();
-  return await confluence.testConnection(profile);
+  return await confluence.testConnection();
 }
 
 /**

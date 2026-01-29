@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the Confluence API functions
 vi.mock('../../src/utils/confluence-client.js', () => ({
@@ -41,87 +41,96 @@ vi.mock('../../src/utils/config-loader.js', async () => {
 // Integration tests that test the entire flow through multiple modules
 
 describe('CLI Integration', () => {
-  let testDir: string;
-  let configPath: string;
+  let testConfigPath: string;
 
   beforeEach(() => {
-    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'conni-cli-integration-'));
-    fs.mkdirSync(path.join(testDir, '.claude'));
-    configPath = path.join(testDir, '.claude', 'atlassian-config.local.md');
+    // Create a temporary config file for testing
+    testConfigPath = path.join(os.tmpdir(), `.connicli-test-${Date.now()}`);
 
-    // Write valid config
-    const configContent = `---
-profiles:
-  cloud:
-    host: https://test.atlassian.net/wiki
-    email: test@test.com
-    apiToken: test_token_123
-  staging:
-    host: https://staging.atlassian.net/wiki
-    email: staging@test.com
-    apiToken: staging_token_456
+    // Write valid INI-style config
+    const configContent = `[auth]
+host=https://test.atlassian.net/wiki
+email=test@test.com
+api_token=test_token_123
 
-defaultProfile: cloud
-defaultFormat: json
----
-
-# Test Config`;
-    fs.writeFileSync(configPath, configContent);
+[defaults]
+format=json
+`;
+    fs.writeFileSync(testConfigPath, configContent);
 
     // Clear all mocks before each test
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
+    // Clean up test config file
+    if (fs.existsSync(testConfigPath)) {
+      fs.unlinkSync(testConfigPath);
+    }
   });
 
   describe('Config Loading Integration', () => {
-    it('should load and parse configuration file', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+    it('should load and parse INI configuration file', async () => {
+      // Get original implementations before spying
+      const originalExistsSync = fs.existsSync.bind(fs);
+      const originalReadFileSync = fs.readFileSync.bind(fs);
+
+      // Mock fs.existsSync to return true for our test config
+      vi.spyOn(fs, 'existsSync').mockImplementation(filePath => {
+        const pathStr = String(filePath);
+        // Check if this is a .connicli file path
+        if (pathStr.includes('.connicli') && !pathStr.includes('test-')) {
+          return true;
+        }
+        return originalExistsSync(filePath as fs.PathLike);
+      });
+
+      // Mock fs.readFileSync to return our test config
+      vi.spyOn(fs, 'readFileSync').mockImplementation((filePath, options) => {
+        const pathStr = String(filePath);
+        // If this is the .connicli file (not test file), return test config
+        if (pathStr.includes('.connicli') && !pathStr.includes('test-')) {
+          return originalReadFileSync(testConfigPath, options);
+        }
+        return originalReadFileSync(filePath as fs.PathLike, options);
+      });
 
       const { loadConfig } = await import('../../src/utils/config-loader.js');
-      const config = await loadConfig(testDir);
+      const config = loadConfig();
 
       expect(config).toBeDefined();
-      expect(config.profiles).toBeDefined();
-      expect(config.profiles.cloud).toBeDefined();
-      expect(config.profiles.cloud.host).toBe('https://test.atlassian.net/wiki');
-      expect(config.profiles.cloud.email).toBe('test@test.com');
-      expect(config.profiles.cloud.apiToken).toBe('test_token_123');
-      expect(config.defaultProfile).toBe('cloud');
+      expect(config.host).toBe('https://test.atlassian.net/wiki');
+      expect(config.email).toBe('test@test.com');
+      expect(config.apiToken).toBe('test_token_123');
       expect(config.defaultFormat).toBe('json');
+
+      vi.restoreAllMocks();
     });
 
-    it('should support multiple profiles', async () => {
-      const { loadConfig } = await import('../../src/utils/config-loader.js');
-      const config = await loadConfig(testDir);
-
-      expect(Object.keys(config.profiles)).toHaveLength(2);
-      expect(config.profiles.cloud).toBeDefined();
-      expect(config.profiles.staging).toBeDefined();
-    });
-
-    it('should validate required profile fields', async () => {
-      const invalidConfig = `---
-profiles:
-  incomplete:
-    host: https://test.atlassian.net/wiki
-    email: test@test.com
-    # Missing apiToken
----
+    it('should validate required fields', async () => {
+      // Write invalid config missing apiToken
+      const invalidConfig = `[auth]
+host=https://test.atlassian.net/wiki
+email=test@test.com
+# Missing api_token
 `;
-      fs.writeFileSync(configPath, invalidConfig);
+      fs.writeFileSync(testConfigPath, invalidConfig);
+
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(invalidConfig);
 
       const { loadConfig } = await import('../../src/utils/config-loader.js');
 
-      expect(() => loadConfig(testDir)).toThrow('missing required field');
+      expect(() => loadConfig()).toThrow('Missing required fields');
+
+      vi.restoreAllMocks();
     });
   });
 
   describe('Command Runner Integration', () => {
     it('should parse command line arguments and execute', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(fs.readFileSync(testConfigPath, 'utf-8') as string);
 
       const { parseArguments } = await import('../../src/utils/arg-parser.js');
       const { listSpaces } = await import('../../src/utils/confluence-client.js');
@@ -129,6 +138,7 @@ profiles:
       // Mock the Confluence API call
       listSpaces.mockResolvedValue({
         success: true,
+        data: [{ key: 'DOCS', name: 'Documentation' }],
         result: JSON.stringify({ spaces: [{ key: 'DOCS', name: 'Documentation' }] }),
       });
 
@@ -149,6 +159,7 @@ profiles:
 
       exitSpy.mockRestore();
       consoleLogSpy.mockRestore();
+      vi.restoreAllMocks();
     });
 
     it('should handle --version flag', async () => {
@@ -214,32 +225,22 @@ profiles:
   });
 
   describe('Confluence API Integration', () => {
-    it('should initialize Confluence client with profile', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+    it('should initialize Confluence client with config', async () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(fs.readFileSync(testConfigPath, 'utf-8') as string);
 
       const { getConfluenceClientOptions } = await import('../../src/utils/config-loader.js');
       const { loadConfig } = await import('../../src/utils/config-loader.js');
 
-      const config = await loadConfig(testDir);
-      const options = getConfluenceClientOptions(config, 'cloud');
+      const config = loadConfig();
+      const options = getConfluenceClientOptions(config);
 
       expect(options.host).toBe('https://test.atlassian.net/wiki');
       expect(options.authentication).toBeDefined();
       expect(options.authentication.basic.email).toBe('test@test.com');
       expect(options.authentication.basic.apiToken).toBe('test_token_123');
-    });
 
-    it('should handle different profiles', async () => {
-      const { getConfluenceClientOptions } = await import('../../src/utils/config-loader.js');
-      const { loadConfig } = await import('../../src/utils/config-loader.js');
-
-      const config = await loadConfig(testDir);
-      const cloudOptions = getConfluenceClientOptions(config, 'cloud');
-      const stagingOptions = getConfluenceClientOptions(config, 'staging');
-
-      expect(cloudOptions.host).toBe('https://test.atlassian.net/wiki');
-      expect(stagingOptions.host).toBe('https://staging.atlassian.net/wiki');
-      expect(cloudOptions).not.toEqual(stagingOptions);
+      vi.restoreAllMocks();
     });
   });
 
@@ -254,7 +255,7 @@ profiles:
 
       expect(consoleLogSpy).toHaveBeenCalledWith('\nAvailable commands:');
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(`1. ${COMMANDS[0]}`));
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(`10. ${COMMANDS[9]}`));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining(`11. ${COMMANDS[10]}`));
 
       consoleLogSpy.mockRestore();
     });
@@ -279,7 +280,8 @@ profiles:
 
   describe('CLI Wrapper Integration', () => {
     it('should initialize CLI with config', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(fs.readFileSync(testConfigPath, 'utf-8') as string);
 
       const { wrapper } = await import('../../src/cli/wrapper.js');
       const { loadConfig } = await import('../../src/utils/config-loader.js');
@@ -288,30 +290,14 @@ profiles:
 
       await cli.connect();
 
-      expect(loadConfig).toHaveBeenCalledWith(testDir);
-    });
+      expect(loadConfig).toHaveBeenCalled();
 
-    it('should handle profile switching', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
-
-      const { wrapper } = await import('../../src/cli/wrapper.js');
-      const cli = new wrapper();
-
-      await cli.connect();
-
-      // Simulate profile switch
-      const handleCommand = cli['handleCommand'].bind(cli);
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      await handleCommand('profile staging');
-
-      expect(consoleLogSpy).toHaveBeenCalledWith('Switched to profile: staging');
-
-      consoleLogSpy.mockRestore();
+      vi.restoreAllMocks();
     });
 
     it('should handle format switching', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(fs.readFileSync(testConfigPath, 'utf-8') as string);
 
       const { wrapper } = await import('../../src/cli/wrapper.js');
       const cli = new wrapper();
@@ -326,83 +312,68 @@ profiles:
       expect(consoleLogSpy).toHaveBeenCalledWith('Output format set to: toon');
 
       consoleLogSpy.mockRestore();
+      vi.restoreAllMocks();
     });
   });
 
   describe('Error Handling Integration', () => {
     it('should handle missing config file', async () => {
-      fs.rmSync(configPath);
-
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+      vi.spyOn(fs, 'existsSync').mockReturnValue(false);
 
       const { loadConfig } = await import('../../src/utils/config-loader.js');
 
-      expect(() => loadConfig(testDir)).toThrow('Configuration file not found');
-    });
+      expect(() => loadConfig()).toThrow('Please run: conni-cli config');
 
-    it('should handle invalid config format', async () => {
-      const invalidConfig = `# Invalid Config
-
-This is just markdown without frontmatter
-`;
-      fs.writeFileSync(configPath, invalidConfig);
-
-      const { loadConfig } = await import('../../src/utils/config-loader.js');
-
-      expect(() => loadConfig(testDir)).toThrow('Invalid configuration file format');
-    });
-
-    it('should handle missing profile', async () => {
-      const { getConfluenceClientOptions } = await import('../../src/utils/config-loader.js');
-      const { loadConfig } = await import('../../src/utils/config-loader.js');
-
-      const config = await loadConfig(testDir);
-
-      expect(() => getConfluenceClientOptions(config, 'nonexistent')).toThrow('Profile "nonexistent" not found');
+      vi.restoreAllMocks();
     });
 
     it('should handle invalid host URL', async () => {
-      const invalidConfig = `---
-profiles:
-  invalid:
-    host: invalid-url
-    email: test@test.com
-    apiToken: token
----
+      const invalidConfig = `[auth]
+host=invalid-url
+email=test@test.com
+api_token=token
 `;
-      fs.writeFileSync(configPath, invalidConfig);
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(invalidConfig);
 
       const { loadConfig } = await import('../../src/utils/config-loader.js');
 
-      expect(() => loadConfig(testDir)).toThrow('host must start with http:// or https://');
+      expect(() => loadConfig()).toThrow('Invalid host');
+
+      vi.restoreAllMocks();
     });
 
     it('should handle invalid email format', async () => {
-      const invalidConfig = `---
-profiles:
-  invalid:
-    host: https://test.atlassian.net/wiki
-    email: invalid-email
-    apiToken: token
----
+      const invalidConfig = `[auth]
+host=https://test.atlassian.net/wiki
+email=invalid-email
+api_token=token
 `;
-      fs.writeFileSync(configPath, invalidConfig);
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(invalidConfig);
 
       const { loadConfig } = await import('../../src/utils/config-loader.js');
 
-      expect(() => loadConfig(testDir)).toThrow('email appears to be invalid');
+      expect(() => loadConfig()).toThrow('Invalid email');
+
+      vi.restoreAllMocks();
     });
   });
 
   describe('End-to-End Workflows', () => {
     it('should execute list-spaces workflow', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(fs.readFileSync(testConfigPath, 'utf-8') as string);
 
       const { runCommand } = await import('../../src/commands/runner.js');
       const { listSpaces } = await import('../../src/utils/confluence-client.js');
 
       listSpaces.mockResolvedValue({
         success: true,
+        data: [
+          { key: 'DOCS', name: 'Documentation' },
+          { key: 'ENG', name: 'Engineering' },
+        ],
         result: JSON.stringify({
           spaces: [
             { key: 'DOCS', name: 'Documentation' },
@@ -422,22 +393,25 @@ profiles:
         // Expected
       }
 
-      expect(listSpaces).toHaveBeenCalledWith('cloud', 'json');
+      expect(listSpaces).toHaveBeenCalledWith('json');
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('DOCS'));
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Engineering'));
 
       exitSpy.mockRestore();
       consoleLogSpy.mockRestore();
+      vi.restoreAllMocks();
     });
 
     it('should execute create-page workflow', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(fs.readFileSync(testConfigPath, 'utf-8') as string);
 
       const { runCommand } = await import('../../src/commands/runner.js');
       const { createPage } = await import('../../src/utils/confluence-client.js');
 
       createPage.mockResolvedValue({
         success: true,
+        data: { id: '12345', title: 'New Page', type: 'page' },
         result: JSON.stringify({
           id: '12345',
           title: 'New Page',
@@ -464,21 +438,28 @@ profiles:
         // Expected
       }
 
-      expect(createPage).toHaveBeenCalledWith('cloud', 'DOCS', 'New Page', '<p>Page content</p>', undefined, 'json');
+      expect(createPage).toHaveBeenCalledWith('DOCS', 'New Page', '<p>Page content</p>', undefined, 'json');
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('12345'));
 
       exitSpy.mockRestore();
       consoleLogSpy.mockRestore();
+      vi.restoreAllMocks();
     });
 
     it('should execute get-user workflow', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(fs.readFileSync(testConfigPath, 'utf-8') as string);
 
       const { runCommand } = await import('../../src/commands/runner.js');
       const { getUser } = await import('../../src/utils/confluence-client.js');
 
       getUser.mockResolvedValue({
         success: true,
+        data: {
+          accountId: '5b10a2844c20165700ede21g',
+          displayName: 'John Doe',
+          email: 'john.doe@test.com',
+        },
         result: JSON.stringify({
           accountId: '5b10a2844c20165700ede21g',
           displayName: 'John Doe',
@@ -497,22 +478,25 @@ profiles:
         // Expected
       }
 
-      expect(getUser).toHaveBeenCalledWith('cloud', '5b10a2844c20165700ede21g', undefined, 'json');
+      expect(getUser).toHaveBeenCalledWith('5b10a2844c20165700ede21g', undefined, 'json');
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('John Doe'));
 
       exitSpy.mockRestore();
       consoleLogSpy.mockRestore();
+      vi.restoreAllMocks();
     });
 
     it('should execute test-connection workflow', async () => {
-      process.env.CLAUDE_PROJECT_ROOT = testDir;
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(fs.readFileSync(testConfigPath, 'utf-8') as string);
 
       const { runCommand } = await import('../../src/commands/runner.js');
       const { testConnection } = await import('../../src/utils/confluence-client.js');
 
       testConnection.mockResolvedValue({
         success: true,
-        result: 'Connection successful!\n\nProfile: cloud\nLogged in as: John Doe (john.doe@test.com)',
+        data: { currentUser: { displayName: 'John Doe', email: 'john.doe@test.com' } },
+        result: 'Connection successful!\n\nLogged in as: John Doe (john.doe@test.com)',
       });
 
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -526,12 +510,13 @@ profiles:
         // Expected
       }
 
-      expect(testConnection).toHaveBeenCalledWith('cloud');
+      expect(testConnection).toHaveBeenCalledWith();
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Connection successful'));
       expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('John Doe'));
 
       exitSpy.mockRestore();
       consoleLogSpy.mockRestore();
+      vi.restoreAllMocks();
     });
   });
 });
