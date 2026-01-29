@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/hesedcasa/conni-cli/compare/conni-cli-v1.1.0...conni-cli-v1.1.1) (2026-01-29)
+
+
+### ♻️ Chores
+
+* reorganize project structure with comprehensive test coverage ([#24](https://github.com/hesedcasa/conni-cli/issues/24)) ([e0a5c28](https://github.com/hesedcasa/conni-cli/commit/e0a5c28f04c540069ffb24e48beeb02fccb80e4d))
+
 ## [1.1.0](https://github.com/hesedcasa/conni-cli/compare/conni-cli-v1.0.0...conni-cli-v1.1.0) (2025-12-11)
 
 
